@@ -1,0 +1,7 @@
+name = "earnings-analyst-api"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+# The SEC asks automated clients to identify themselves with a contact email.
+CONTACT_EMAIL = "replace-with-your-email"

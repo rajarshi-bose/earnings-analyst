@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Earnings Report Qualitative Analyst</title>
+<meta name="description" content="Pick an S&P 500 company and a quarter. Read the tone of its earnings release and the share price in the two quarters before it.">
+<meta property="og:title" content="Earnings Report Qualitative Analyst">
+<meta property="og:description" content="The tone of an S&P 500 earnings release, word by word, next to the share price before it.">
+<meta name="theme-color" content="#0e1012">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sixtyfour&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --ink:#0e1012; --panel:#15181c; --panel-2:#1d2126; --rule:#2a2f36;
+  --text:#e8eaed; --muted:#8b929c; --dim:#3d434c;
+  --up:#33c27a; --down:#ef5056;
+  --up-wash:rgba(51,194,122,.12); --down-wash:rgba(239,80,86,.12);
+  --f-display:"Sixtyfour",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --ease-out:cubic-bezier(.19,1,.22,1);
+  --gut:max(16px,env(safe-area-inset-left));
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:inherit}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)} .muted{color:var(--muted)}
+:focus-visible{outline:2px solid var(--up);outline-offset:3px}
+.wrap{max-width:1360px;margin:0 auto;padding:0 var(--gut)}
+
+/* return button: jarsh.us brand spec, colors from this app */
+.jarsh-home{--jh-color:#e8eaed;--jh-hover:#33c27a;display:inline-flex;align-items:center;gap:8px;font:700 16px/1 "Schibsted Grotesk","Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-.01em;color:var(--jh-color);text-decoration:none;white-space:nowrap;transition:color .15s}
+.jarsh-home svg{width:14px;height:17px;flex:none;transition:transform .2s cubic-bezier(.19,1,.22,1)}
+.jarsh-home:hover,.jarsh-home:focus-visible{color:var(--jh-hover)}
+.jarsh-home:hover svg,.jarsh-home:focus-visible svg{transform:translateY(-2px)}
+
+/* top bar */
+.top{border-bottom:1px solid var(--rule);background:#0a0b0d}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:52px}
+.top .src{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* hero */
+.hero{padding:clamp(32px,6vw,72px) 0 clamp(20px,3vw,32px)}
+.hero h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,5.4vw,72px);line-height:1.02;letter-spacing:0;margin:0;text-transform:uppercase;text-wrap:balance}
+.hero h1 span{display:block}
+.hero h1 em{font-style:normal;color:var(--up)}
+.hero h1 i{font-style:normal;color:var(--down)}
+.hero p{max-width:62ch;margin:18px 0 0;color:var(--muted);font-size:16px;text-wrap:pretty}
+
+/* controls */
+.controls{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:12px;align-items:end;padding:18px;background:var(--panel);border:1px solid var(--rule)}
+.field label,.field .lbl{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.box{position:relative}
+.inp,.pick{width:100%;height:46px;background:var(--ink);border:1px solid var(--rule);padding:0 14px;font-size:16px;border-radius:0;transition:border-color .15s}
+.inp:hover,.pick:hover:not(:disabled){border-color:var(--muted)}
+.inp:focus{outline:none;border-color:var(--up)}
+.inp::placeholder{color:var(--dim)}
+.pick{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+.pick:disabled{color:var(--dim);cursor:not-allowed}
+.pick .caret{width:10px;height:10px;flex:none;transition:transform .2s var(--ease-out)}
+.pick[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.pick .val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;background:#000;border:1px solid var(--rule);max-height:320px;overflow:auto;margin:0;padding:4px 0;list-style:none;display:none}
+.menu.open{display:block;animation:drop .18s var(--ease-out)}
+@keyframes drop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.menu li{display:flex;align-items:baseline;gap:12px;padding:9px 14px;cursor:pointer}
+.menu li .t{font-family:var(--f-mono);font-weight:600;min-width:58px}
+.menu li .n{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu li .s{color:var(--muted);font-size:13px;margin-left:auto;white-space:nowrap}
+.menu li[aria-selected="true"]{background:var(--up);color:#000}
+.menu li[aria-selected="true"] .n,.menu li[aria-selected="true"] .s{color:#000}
+.menu .empty{color:var(--muted);cursor:default}
+.go{height:46px;padding:0 26px;background:var(--text);color:var(--ink);border:1px solid var(--text);font-weight:700;font-size:16px;border-radius:0;transition:background .15s,border-color .15s,transform .1s}
+.go:hover:not(:disabled){background:var(--up);border-color:var(--up);color:#000}
+.go:active:not(:disabled){transform:scale(.97)}
+.go:disabled{background:transparent;color:var(--dim);border-color:var(--rule);cursor:not-allowed}
+.status{grid-column:1/-1;min-height:20px;margin:0;font-size:14px;color:var(--muted)}
+.status.err{color:var(--down)}
+.status .dot{display:inline-block;width:7px;height:7px;background:var(--up);margin-right:8px;vertical-align:1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:.15}}
+
+/* results */
+#results{display:none;padding-bottom:64px}
+#results.show{display:block}
+.rhead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px;padding:clamp(28px,4vw,44px) 0 18px;border-bottom:2px solid var(--text)}
+.rhead h2{margin:0;font-size:clamp(26px,3.4vw,40px);line-height:1.05;letter-spacing:-.02em;font-weight:700;text-wrap:balance}
+.rhead h2 .tk{font-family:var(--f-mono);font-weight:500;color:var(--muted);font-size:.62em;letter-spacing:0;margin-left:10px;white-space:nowrap}
+.rhead .meta{margin:8px 0 0;color:var(--muted);font-size:14px}
+.rhead .meta b{color:var(--text);font-weight:600}
+.link{display:inline-flex;align-items:center;gap:8px;font-weight:600;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px;white-space:nowrap;transition:color .15s}
+.link:hover{color:var(--up)}
+.link svg{width:11px;height:11px;transition:transform .2s var(--ease-out)}
+.link:hover svg{transform:translate(2px,-2px)}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rule)}
+.stat{padding:16px 16px 18px 0}
+.stat+.stat{padding-left:16px;border-left:1px solid var(--rule)}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-family:var(--f-mono);font-size:clamp(22px,2.6vw,32px);font-weight:500;line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums}
+.split{display:flex;height:6px;margin-top:10px;background:var(--panel-2)}
+.split span{display:block;height:100%}
+
+section.blk{margin-top:clamp(36px,5vw,56px)}
+.bh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 24px;border-top:1px solid var(--rule);padding-top:14px;margin-bottom:16px}
+.bh h3{margin:0;font-size:18px;font-weight:600}
+.bh p{margin:0;color:var(--muted);font-size:13px;max-width:70ch}
+
+/* chart */
+.chart{position:relative;background:var(--panel);border:1px solid var(--rule)}
+.chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.chart .tip{position:absolute;pointer-events:none;background:#000;border:1px solid var(--rule);padding:6px 9px;font-family:var(--f-mono);font-size:12px;white-space:nowrap;opacity:0;transition:opacity .12s}
+.chart .tip b{font-weight:600}
+.axis text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.qlab{font-family:var(--f-body);font-size:12px;font-weight:600;fill:var(--text)}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:12px;color:var(--muted);font-weight:500;text-align:left;padding:10px 12px 8px 0;border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:11px 12px 11px 0;border-bottom:1px solid var(--rule);vertical-align:baseline}
+th.r,td.r{text-align:right}
+td.num,th.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tr.total td{border-bottom:2px solid var(--text);font-weight:600}
+.scroll{overflow-x:auto}
+.prices{margin-top:14px;min-width:620px}
+.prices td:first-child{font-weight:600;white-space:nowrap}
+.prices td:nth-child(2){white-space:nowrap}
+
+/* tone */
+.tone{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(16px,2.4vw,32px);align-items:start}
+.cloudbox{position:relative;aspect-ratio:1/1;background:var(--panel);border:1px solid var(--rule);overflow:hidden}
+.cloudbox svg{position:absolute;inset:0;width:100%;height:100%}
+.cloudbox .cw{font-family:var(--f-body);font-weight:600;cursor:pointer;transition:opacity .2s}
+.cloudbox svg.dimmed .cw{opacity:.28}
+.cloudbox svg.dimmed .cw.on{opacity:1}
+.cloudbox .cw.in{animation:rise .7s var(--ease-out) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.cloudnote{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13px;color:var(--muted)}
+.key{display:inline-flex;align-items:center;gap:7px}
+.key i{display:inline-block;width:9px;height:9px}
+.sizes{display:inline-flex;align-items:baseline;gap:8px}
+.sizes span{font-weight:600;color:var(--muted);line-height:1}
+
+.wt{table-layout:fixed}
+.wt th.side{font-size:13px;font-weight:600;color:var(--text);border-bottom:2px solid currentColor;padding-top:0}
+.wt th.side.up{color:var(--up)} .wt th.side.down{color:var(--down)}
+.wt td{padding:0;border-bottom:1px solid var(--rule)}
+.wt td+td{border-left:1px solid var(--rule)}
+.wbtn{display:flex;width:100%;align-items:baseline;gap:8px;padding:9px 10px;background:none;border:0;text-align:left;transition:background .15s}
+.wbtn:hover{background:var(--panel-2)}
+.wbtn[aria-pressed="true"]{background:var(--panel-2);box-shadow:inset 3px 0 0 currentColor}
+.wbtn .w{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.wbtn .sc{font-family:var(--f-mono);font-size:12px}
+.wbtn .ct{font-family:var(--f-mono);font-size:12px;color:var(--muted);min-width:2.6em;text-align:right}
+.wt .none{padding:9px 10px;color:var(--dim)}
+.wt .rk{font-family:var(--f-mono);font-size:11px;color:var(--dim);min-width:1.4em}
+.wthead{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:6px 10px 0}
+
+.ctx{margin-top:18px;background:var(--panel);border:1px solid var(--rule);padding:16px 18px;min-height:96px}
+.ctx h4{margin:0 0 4px;font-size:15px;font-weight:600}
+.ctx .sub{margin:0 0 10px;font-size:13px;color:var(--muted)}
+.ctx ol{margin:0;padding-left:1.4em;display:grid;gap:10px}
+.ctx li{text-wrap:pretty;max-width:80ch}
+.ctx li::marker{font-family:var(--f-mono);color:var(--muted);font-size:12px}
+.ctx mark{background:none;font-weight:700;color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:2px}
+.ctx mark.up{text-decoration-color:var(--up);color:var(--up)} .ctx mark.down{text-decoration-color:var(--down);color:var(--down)}
+.ctx .hint{color:var(--muted);margin:0}
+
+.method{margin-top:clamp(36px,5vw,56px);border-top:1px solid var(--rule);padding-top:14px;display:grid;grid-template-columns:minmax(0,3fr) minmax(0,9fr);gap:12px 24px;font-size:14px;color:var(--muted)}
+.method h3{margin:0;font-size:14px;color:var(--text);font-weight:600}
+.method p{margin:0 0 8px;max-width:72ch;text-wrap:pretty}
+
+.foot{border-top:1px solid var(--rule);margin-top:48px;padding-top:18px;padding-bottom:28px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px}
+
+@media (max-width:900px){
+  .controls{grid-template-columns:1fr 1fr}
+  .controls .go{grid-column:1/-1}
+  .tone{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat:nth-child(3){border-left:0;padding-left:0}
+  .stat:nth-child(n+3){border-top:1px solid var(--rule)}
+  .method{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .controls{grid-template-columns:1fr;padding:14px}
+  .top .src{display:none}
+  .menu li .s{display:none}
+  .prices{min-width:0}
+  .prices th:nth-child(2),.prices td:nth-child(2),.prices th:nth-child(4),.prices td:nth-child(4){display:none}
+  .prices th,.prices td{padding-right:8px;font-size:13px}
+  .prices th{white-space:normal}
+  .wt .rk{display:none}
+  .wbtn{padding:9px 6px;gap:5px}
+  .wbtn .ct{min-width:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="jarsh-home" href="https://jarsh.us" aria-label="Back to jarsh.us">
+      <svg viewBox="2 1 12 14" fill="currentColor" shape-rendering="crispEdges" aria-hidden="true">
+        <path d="M3 1H5V3H6V2H7V1H9V2H10V3H11V4H12V5H13V6H14V15H2V6H3Z"/>
+      </svg>
+      <span>jarsh.us</span>
+    </a>
+    <span class="src">Filings from SEC EDGAR, prices from public market data</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1><span>Earnings report</span><span><em>qualitative</em> <i>analyst</i></span></h1>
+    <p>Pick an S&amp;P 500 company and one of its quarterly earnings releases. The tool reads the release from SEC EDGAR, scores the tone of every word, and sets it next to how the stock moved in the two quarters before.</p>
+  </div>
+
+  <form class="controls" id="form" autocomplete="off" novalidate>
+    <div class="field">
+      <label for="co">Company</label>
+      <div class="box">
+        <input class="inp" id="co" type="text" placeholder="Ticker or name, like AAPL" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="coList" spellcheck="false" autocapitalize="characters">
+        <ul class="menu" id="coList" role="listbox" aria-label="S&amp;P 500 companies"></ul>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="qLbl">Quarter</span>
+      <div class="box">
+        <button class="pick" id="q" type="button" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="qLbl q" disabled>
+          <span class="val" id="qVal">Choose a company first</span>
+          <svg class="caret" viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        </button>
+        <ul class="menu" id="qList" role="listbox" aria-labelledby="qLbl" tabindex="-1"></ul>
+      </div>
+    </div>
+    <button class="go" id="go" type="submit" disabled>Analyze</button>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </form>
+
+  <div id="results" aria-live="off">
+    <div class="rhead">
+      <div>
+        <h2 id="rTitle"></h2>
+        <p class="meta" id="rMeta"></p>
+      </div>
+      <a class="link" id="rLink" href="#" target="_blank" rel="noopener">Read the release
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 9L9 3M4 3h5v5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      </a>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <section class="blk" aria-labelledby="pH">
+      <div class="bh">
+        <h3 id="pH">Share price before the quarter</h3>
+        <p id="pNote"></p>
+      </div>
+      <div class="chart" id="chart"><div class="tip" id="tip"></div></div>
+      <div class="scroll"><table class="prices" id="pTable"></table></div>
+    </section>
+
+    <section class="blk" aria-labelledby="tH">
+      <div class="bh">
+        <h3 id="tH">Tone of the release</h3>
+        <p>Bigger words carry a stronger tone. Select a word to read it in context.</p>
+      </div>
+      <div class="tone">
+        <div>
+          <div class="cloudbox" id="cloud"></div>
+          <div class="cloudnote">
+            <span class="key"><i style="background:var(--up)"></i>Positive</span>
+            <span class="key"><i style="background:var(--down)"></i>Negative</span>
+            <span class="sizes" aria-hidden="true"><span style="font-size:11px">mild</span><span style="font-size:15px">strong</span><span style="font-size:20px">very strong</span></span>
+            <span id="cloudCount"></span>
+          </div>
+        </div>
+        <div>
+          <table class="wt" id="wTable"></table>
+          <div class="ctx" id="ctx" aria-live="polite"><p class="hint">Select a word in the cloud or the table to see the sentences it came from.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="method">
+      <h3>How this reads a release</h3>
+      <div>
+        <p>The release is the press release a company files with the SEC on Form 8-K (item 2.02, usually exhibit 99.1). Financial tables, the forward-looking statements notice and other legal boilerplate are left out, so the score reflects the words management chose to describe the quarter.</p>
+        <p>Each word is scored from 1 to 5 for how strongly positive or negative it reads in an earnings context, using a word list written for financial language: "loss" and "headwinds" count as negative, "liability" and "tax" do not. A word right after "not", "no" or "without" is skipped. Net tone is positive weight minus negative weight over the total, from -100 to +100.</p>
+        <p>Prices are daily closes adjusted for splits and dividends. Quarters follow the company's own reporting dates where the SEC has them.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="wrap foot">
+  <span>Earnings Report Qualitative Analyst, a tool on jarsh.us</span>
+  <span>Not investment advice</span>
+</footer>
+
+<script>
+"use strict";
+
+/* ---------- configuration ---------- */
+// Address of the data service (worker/worker.js, deployed on Cloudflare Workers).
+const API = (() => {
+  const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const override = new URLSearchParams(location.search).get("api");
+  return (local && override) || "https://earnings-analyst-api.jarsh.workers.dev";
+})();
+
+/* ---------- tone word list ----------
+   Scores from 1 (mild) to 5 (very strong), written for earnings releases.
+   Words that are neutral in finance (liability, tax, cost, charge, debt) are left out on purpose. */
+const LEXICON = (() => {
+  const pos = {
+    5: "exceptional exceptionally outstanding extraordinary phenomenal spectacular stellar superb remarkable remarkably breakthrough breakthroughs record-breaking record-high",
+    4: "excellent excellence tremendous terrific impressive exceeded exceeding exceeds surpassed outperformed outperforming outperformance surged surge surging soared soaring thrilled delighted robust record strongest best best-ever",
+    3: "strong stronger strongly strength strengths accelerate accelerated accelerating acceleration momentum beat beats achieved achievement achievements success successful successfully profitable pleased proud confident confidence healthy solid favorable favorably upside milestone milestones resilient resilience excited exciting rebound rebounded optimistic optimism encouraged encouraging well-positioned outpaced winning wins great happy innovative surpass record-setting",
+    2: "growth grew grow growing expand expanded expanding expansion gain gains gained improve improved improvement improvements improving profitability efficient efficiencies efficiency positive opportunity opportunities progress advance advancing raised raise raising benefit benefited benefiting enhance enhanced boost boosted upgrade upgraded attractive valuable rewarding durable recovery recovered leadership leading innovation good better won disciplined accretive tailwind tailwinds",
+    1: "stable stability steady steadily consistent consistently sustainable sustained higher strategic benefits discipline secure secured on-track",
+  };
+  const neg = {
+    5: "catastrophic disastrous devastating collapse collapsed bankruptcy bankrupt insolvency insolvent fraud fraudulent plummeted plunged plunge crashed",
+    4: "poorly dismal severe severely slump slumped default defaulted restatement worst worsened worsening deteriorate deteriorated deterioration deteriorating shortfall shortfalls disappointing disappointed disappointment tumbled sank crisis turmoil alarming weakest",
+    3: "weak weaker weakness weakened weakening impairment impairments impaired missed miss misses adverse adversely failure failures failed fail unfavorable unfavorably slowdown downturn recession disruption disruptions disrupted shortage shortages layoffs penalty penalties violation violations recall recalls breach downgrade downgraded unable inability underperformed underperformance underperforming writedown write-down write-downs write-off write-offs damage damaged erosion eroded poor bad worse struggling struggled struggle suffered unprofitable sluggish stagnant stagnation lackluster worrisome troubled unsuccessful setback setbacks doubtful restated",
+    2: "loss losses lost lose decline declined declines declining lowered headwind headwinds challenging difficult difficulty difficulties pressure pressures pressured softness soft softer slowed slower slowing slow uncertain uncertainty uncertainties volatile volatility delay delays delayed restructuring negative negatively concern concerns risky problem problems burden costly dropped drop fell fall falling terminated termination closure closures deficit litigation lawsuit lawsuits investigation dilution dilutive constrained stress strained obstacle obstacles contraction lowest",
+    1: "decrease decreased decreases decreasing lower reduced challenge challenges risk risks inflation inflationary tariff tariffs constraints cautious",
+  };
+  const map = new Map();
+  for (const s in pos) for (const w of pos[s].split(" ")) map.set(w, +s);
+  for (const s in neg) for (const w of neg[s].split(" ")) map.set(w, -s);
+  return map;
+})();
+const NEGATORS = new Set(["not", "no", "never", "without", "nor", "neither", "cannot", "didn't", "don't", "doesn't", "isn't", "wasn't", "weren't", "aren't", "won't", "hasn't", "haven't", "lack", "lacked"]);
+const BOILERPLATE = /forward[- ]looking|safe harbor|private securities litigation|undue reliance|risks and uncertainties|securities exchange act|risk factors|annual report on form 10-k|quarterly report on form 10-q|reconciliation of|non-gaap financial measure/i;
+
+/* ---------- helpers ---------- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtDate = (iso, year = true) => { const [y, m, d] = iso.split("-").map(Number); return `${MON[m - 1]} ${d}${year ? ", " + y : ""}`; };
+const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPct = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(1) + "%";
+const fmtPts = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(1) + " pts";
+const cls = (n) => (n > 0 ? "up" : n < 0 ? "down" : "");
+const addDays = (iso, k) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); };
+// A quarter is named by the calendar quarter holding most of it (a quarter ending Oct 26 is Q3).
+const quarterName = (end) => { const d = new Date(addDays(end, -45) + "T00:00:00Z"); return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`; };
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+async function api(path) {
+  let res;
+  try { res = await fetch(API + path); }
+  catch { throw new Error("The data service could not be reached. Try again in a moment."); }
+  let body = null;
+  try { body = await res.json(); } catch {}
+  if (!res.ok) throw new Error((body && body.error) || "The data service returned an error.");
+  return body;
+}
+
+function setStatus(msg, kind) {
+  const el = $("status");
+  el.className = "status" + (kind === "err" ? " err" : "");
+  el.innerHTML = kind === "busy" ? `<span class="dot" aria-hidden="true"></span>${esc(msg)}` : esc(msg || "");
+}
+
+/* ---------- company picker ---------- */
+let COMPANIES = [];
+let company = null;     // {t, n, cik}
+let releases = [];      // from /filings
+let release = null;     // chosen release
+let coActive = -1;
+let companiesLoading = true, pendingEnter = false;
+
+const coInput = $("co"), coList = $("coList");
+
+function coMatches(q) {
+  q = q.trim().toUpperCase();
+  if (!q) return COMPANIES.slice(0, 8);
+  const norm = q.replace(/\./g, "-");
+  const starts = [], names = [], rest = [];
+  for (const c of COMPANIES) {
+    if (c.t === norm) starts.unshift(c);
+    else if (c.t.startsWith(norm)) starts.push(c);
+    else if (c.n.toUpperCase().startsWith(q)) names.push(c);
+    else if (c.n.toUpperCase().includes(q)) rest.push(c);
+  }
+  return [...starts, ...names, ...rest].slice(0, 8);
+}
+function renderCo() {
+  const list = coMatches(coInput.value);
+  if (!COMPANIES.length) { closeCo(); return; }
+  coList.innerHTML = list.length
+    ? list.map((c, i) => `<li role="option" id="co-${i}" data-t="${esc(c.t)}" aria-selected="${i === coActive}"><span class="t">${esc(c.t.replace(/-/g, "."))}</span><span class="n">${esc(c.n)}</span></li>`).join("")
+    : `<li class="empty" role="option" aria-disabled="true">Not in the S&amp;P 500 list</li>`;
+  coList.classList.add("open");
+  coInput.setAttribute("aria-expanded", "true");
+  coInput.setAttribute("aria-activedescendant", coActive >= 0 ? "co-" + coActive : "");
+}
+function closeCo() { coList.classList.remove("open"); coInput.setAttribute("aria-expanded", "false"); coActive = -1; }
+
+coInput.addEventListener("input", () => { coActive = 0; renderCo(); if (company && coInput.value !== label(company)) clearCompany(); });
+coInput.addEventListener("focus", () => { if (!company) { coActive = coInput.value ? 0 : -1; renderCo(); } });
+coInput.addEventListener("blur", () => setTimeout(closeCo, 120));
+coInput.addEventListener("keydown", (e) => {
+  const items = [...coList.querySelectorAll("li[data-t]")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!coList.classList.contains("open")) { renderCo(); return; }
+    coActive = Math.max(0, Math.min(items.length - 1, coActive + (e.key === "ArrowDown" ? 1 : -1)));
+    renderCo();
+    coList.querySelector(`#co-${coActive}`)?.scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const pick = items[coActive] || items[0];
+    if (pick && coList.classList.contains("open")) chooseCompany(pick.dataset.t);
+    else if (companiesLoading && coInput.value.trim()) { pendingEnter = true; setStatus("Loading the company list", "busy"); }
+    else if (!COMPANIES.length && coInput.value.trim()) chooseCompany(coInput.value.trim().toUpperCase().replace(/\./g, "-"));
+    else if (company && release) $("form").requestSubmit();
+  } else if (e.key === "Escape") closeCo();
+});
+coList.addEventListener("mousedown", (e) => { const li = e.target.closest("li[data-t]"); if (li) { e.preventDefault(); chooseCompany(li.dataset.t); } });
+
+const label = (c) => `${c.t.replace(/-/g, ".")}  ${c.n}`;
+
+function clearCompany() {
+  company = null; releases = []; release = null;
+  $("q").disabled = true; $("qVal").textContent = "Choose a company first"; $("go").disabled = true;
+}
+
+async function chooseCompany(t, wantAcc) {
+  const c = COMPANIES.find((x) => x.t === t) || { t, n: t };
+  company = c;
+  coInput.value = label(c);
+  closeCo();
+  $("q").disabled = true; $("go").disabled = true; release = null;
+  $("qVal").textContent = "Finding earnings releases";
+  setStatus(`Looking up ${c.n}'s earnings releases`, "busy");
+  try {
+    const data = await api(`/filings?ticker=${encodeURIComponent(t)}`);
+    if (company !== c) return;
+    company = { t: data.ticker, n: c.n !== t ? c.n : titleCase(data.name), cik: data.cik };
+    coInput.value = label(company);
+    releases = data.releases;
+    release = releases.find((r) => r.acc === wantAcc) || releases[0];
+    renderQuarter();
+    $("q").disabled = false; $("go").disabled = false;
+    setStatus(`${releases.length} earnings releases found. Choose a quarter, then Analyze.`);
+    return true;
+  } catch (err) {
+    if (company !== c) return;
+    $("qVal").textContent = "No releases found";
+    setStatus(err.message, "err");
+    return false;
+  }
+}
+const titleCase = (s) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(Inc|Corp|Co|Ltd|Plc)\b\.?/g, (m) => m);
+
+/* ---------- quarter picker ---------- */
+const qBtn = $("q"), qList = $("qList");
+let qActive = 0;
+const relLabel = (r) => quarterName(r.periodEnd);
+const relSub = (r) => `Released ${fmtDate(r.filed)}`;
+
+function renderQuarter() { $("qVal").textContent = release ? `${relLabel(release)}, released ${fmtDate(release.filed)}` : "Choose a quarter"; }
+function openQ() {
+  qActive = Math.max(0, releases.indexOf(release));
+  drawQ();
+  qList.classList.add("open"); qBtn.setAttribute("aria-expanded", "true");
+  qList.focus();
+  qList.querySelector(`#q-${qActive}`)?.scrollIntoView({ block: "nearest" });
+}
+function drawQ() {
+  qList.innerHTML = releases.map((r, i) => `<li role="option" id="q-${i}" data-i="${i}" aria-selected="${i === qActive}"><span class="t">${relLabel(r)}</span><span class="n">Quarter ended ${fmtDate(r.periodEnd)}</span><span class="s">${relSub(r)}</span></li>`).join("");
+  qList.setAttribute("aria-activedescendant", "q-" + qActive);
+}
+function closeQ(focus) { qList.classList.remove("open"); qBtn.setAttribute("aria-expanded", "false"); if (focus) qBtn.focus(); }
+function pickQ(i) { release = releases[i]; renderQuarter(); closeQ(true); }
+qBtn.addEventListener("click", () => (qList.classList.contains("open") ? closeQ() : openQ()));
+qBtn.addEventListener("keydown", (e) => { if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); openQ(); } });
+qList.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    qActive = Math.max(0, Math.min(releases.length - 1, qActive + (e.key === "ArrowDown" ? 1 : -1)));
+    drawQ(); qList.querySelector(`#q-${qActive}`)?.scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pickQ(qActive); }
+  else if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); closeQ(true); }
+});
+qList.addEventListener("mousedown", (e) => { const li = e.target.closest("li[data-i]"); if (li) { e.preventDefault(); pickQ(+li.dataset.i); } });
+document.addEventListener("mousedown", (e) => { if (!e.target.closest("#q, #qList")) closeQ(); });
+
+/* ---------- analysis ---------- */
+$("form").addEventListener("submit", (e) => { e.preventDefault(); if (company && release) analyze(); });
+
+let running = 0;
+async function analyze() {
+  const run = ++running;
+  const c = company, r = release;
+  $("go").disabled = true;
+  setStatus("Reading the release and loading prices", "busy");
+
+  // The two quarters before the reported one: (end Q-3, end Q-2] and (end Q-2, end Q-1].
+  const [e1, e2, e3] = r.priorEnds;
+  const from = addDays(e3, -10), to = e1;
+  try {
+    const [rep, px, ix] = await Promise.all([
+      api(`/report?cik=${c.cik}&acc=${r.acc}`),
+      api(`/prices?symbol=${encodeURIComponent(c.t)}&from=${from}&to=${to}`),
+      api(`/prices?symbol=%5EGSPC&from=${from}&to=${to}`).catch(() => null),
+    ]);
+    if (run !== running) return;
+    const tone = readTone(rep.html);
+    if (tone.words < 40) throw new Error("This release has too little text to read. Try another quarter.");
+    const quarters = [
+      { name: quarterName(e2), start: e3, end: e2 },
+      { name: quarterName(e1), start: e2, end: e1 },
+    ];
+    renderResults(c, r, rep, tone, px.points, ix && ix.points, quarters);
+    setStatus("");
+    const q = new URLSearchParams(location.search);
+    q.set("ticker", c.t); q.set("filing", r.acc);
+    history.replaceState(null, "", "?" + q.toString());
+  } catch (err) {
+    if (run !== running) return;
+    setStatus(err.message, "err");
+  } finally {
+    if (run === running) $("go").disabled = false;
+  }
+}
+
+/* ---------- reading the release ---------- */
+function readTone(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,style,img,ix\\:header,[style*='display:none'],[style*='display: none']").forEach((n) => n.remove());
+
+  // Drop financial tables (mostly numbers); keep tables used only for layout.
+  doc.querySelectorAll("table").forEach((t) => {
+    const cells = [...t.querySelectorAll("td")].map((td) => td.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+    const numeric = cells.filter((s) => /^[\s$€(]*[-–—]?[\d,.]+\s*%?\)?$|^[—–-]+$|^\$$|^\)$|^%$/.test(s)).length;
+    if (!cells.length || numeric / cells.length > 0.25) t.remove();
+  });
+
+  // Mark block edges so the text splits into paragraphs.
+  doc.querySelectorAll("p,div,li,tr,td,h1,h2,h3,h4,h5,h6,br").forEach((n) => n.after(doc.createTextNode("\n")));
+  const paras = (doc.body ? doc.body.textContent : "")
+    .split(/\n+/)
+    .map((s) => s.replace(/\s+/g, " ").trim())
+    .filter((s) => s.length > 2);
+
+  // Remove legal boilerplate, and everything after a "Forward-looking statements" heading.
+  const kept = [];
+  let inLegal = false;
+  for (const p of paras) {
+    if (p.length < 60 && /^(cautionary|forward[- ]looking|safe harbor|use of non-gaap|non-gaap financial measures)/i.test(p)) { inLegal = true; continue; }
+    if (inLegal && p.length < 60 && /^(about |contacts?|investor|media|conference call|webcast)/i.test(p)) inLegal = false;
+    if (inLegal || BOILERPLATE.test(p)) continue;
+    kept.push(p);
+  }
+
+  const sentences = [];
+  const found = new Map(); // word -> {score, count, negated, refs:[sentence idx]}
+  let words = 0;
+  for (const p of kept) {
+    for (const s of p.split(/(?<=[.!?;])\s+(?=[A-Z0-9"“(])/)) {
+      const si = sentences.push(s) - 1;
+      const toks = s.toLowerCase().replace(/[‘’]/g, "'").match(/[a-z]+(?:[-'][a-z]+)*/g) || [];
+      toks.forEach((tok, i) => {
+        words++;
+        let score = LEXICON.get(tok);
+        if (score === undefined && tok.endsWith("'s")) score = LEXICON.get(tok.slice(0, -2));
+        if (score === undefined) return;
+        let w = found.get(tok);
+        if (!w) found.set(tok, (w = { word: tok, score, count: 0, negated: 0, refs: [] }));
+        const near = toks.slice(Math.max(0, i - 3), i);
+        if (near.some((t) => NEGATORS.has(t) || t.endsWith("n't"))) { w.negated++; return; }
+        w.count++;
+        if (w.refs.length < 4 && w.refs[w.refs.length - 1] !== si) w.refs.push(si);
+      });
+    }
+  }
+  const list = [...found.values()].filter((w) => w.count > 0);
+  const pos = list.filter((w) => w.score > 0), neg = list.filter((w) => w.score < 0);
+  const pw = pos.reduce((a, w) => a + w.score * w.count, 0);
+  const nw = neg.reduce((a, w) => a - w.score * w.count, 0);
+  const rank = (a, b) => Math.abs(b.score) - Math.abs(a.score) || b.count - a.count || a.word.localeCompare(b.word);
+  return {
+    words, sentences, list,
+    pos: pos.sort(rank), neg: neg.sort(rank),
+    posUses: pos.reduce((a, w) => a + w.count, 0), negUses: neg.reduce((a, w) => a + w.count, 0),
+    pw, nw, net: pw + nw ? Math.round(((pw - nw) / (pw + nw)) * 100) : 0,
+  };
+}
+
+/* ---------- rendering ---------- */
+let current = null;
+
+function renderResults(c, r, rep, tone, points, index, quarters) {
+  current = { tone, points, quarters };
+  $("rTitle").innerHTML = `${esc(c.n)}<span class="tk">${esc(c.t.replace(/-/g, "."))}</span>`;
+  $("rMeta").innerHTML = `<b>${quarterName(r.periodEnd)}</b> earnings, quarter ended ${fmtDate(r.periodEnd)}${r.periodEstimated ? " (estimated)" : ""}. Released ${fmtDate(r.filed)}.`;
+  $("rLink").href = rep.url;
+
+  const total = tone.posUses + tone.negUses;
+  const pShare = total ? (tone.pw / (tone.pw + tone.nw)) * 100 : 50;
+  $("stats").innerHTML = `
+    <div class="stat"><div class="k">Words read</div><div class="v">${tone.words.toLocaleString()}</div></div>
+    <div class="stat"><div class="k">Tone words used</div><div class="v">${total.toLocaleString()}</div></div>
+    <div class="stat"><div class="k">Positive and negative</div><div class="v"><span class="up">${tone.posUses}</span><span class="muted"> / </span><span class="down">${tone.negUses}</span></div>
+      <div class="split" aria-hidden="true"><span style="width:${pShare}%;background:var(--up)"></span><span style="width:${100 - pShare}%;background:var(--down)"></span></div></div>
+    <div class="stat"><div class="k">Net tone, -100 to +100</div><div class="v ${cls(tone.net)}">${tone.net > 0 ? "+" : tone.net < 0 ? "−" : ""}${Math.abs(tone.net)}</div></div>`;
+
+  // Price rows
+  const at = (pts, iso) => { let v = null; for (const [d, p] of pts) { if (d <= iso) v = p; else break; } return v; };
+  const rows = quarters.map((q) => {
+    const a = at(points, q.start), b = at(points, q.end);
+    const ia = index && at(index, q.start), ib = index && at(index, q.end);
+    return { ...q, a, b, ch: a && b ? (b / a - 1) * 100 : null, ich: ia && ib ? (ib / ia - 1) * 100 : null };
+  });
+  const all = { name: "Both quarters", start: quarters[0].start, end: quarters[1].end, a: rows[0].a, b: rows[1].b };
+  all.ch = all.a && all.b ? (all.b / all.a - 1) * 100 : null;
+  const ia = index && at(index, all.start), ib = index && at(index, all.end);
+  all.ich = ia && ib ? (ib / ia - 1) * 100 : null;
+  current.rows = rows;
+
+  const cell = (v, f) => (v == null ? `<td class="num r muted">n/a</td>` : `<td class="num r ${cls(v)}">${f(v)}</td>`);
+  const tr = (q, total) => `<tr${total ? ' class="total"' : ""}><td>${q.name}</td><td class="num muted">${fmtDate(addDays(q.start, 1), false)} to ${fmtDate(q.end)}</td>
+    <td class="num r">${q.a ? fmtMoney(q.a) : "n/a"}</td><td class="num r">${q.b ? fmtMoney(q.b) : "n/a"}</td>
+    ${cell(q.ch, fmtPct)}${cell(q.ich, fmtPct)}${cell(q.ch != null && q.ich != null ? q.ch - q.ich : null, fmtPts)}</tr>`;
+  $("pTable").innerHTML = `<thead><tr><th>Quarter</th><th>Dates</th><th class="r">Start price</th><th class="r">End price</th><th class="r">Change</th><th class="r">S&amp;P 500</th><th class="r">Against the index</th></tr></thead>
+    <tbody>${rows.map((q) => tr(q)).join("")}${tr(all, true)}</tbody>`;
+  $("pNote").textContent = `The two quarters before ${quarterName(r.periodEnd)}. Start price is the close on the day the quarter began.`;
+
+  $("results").classList.add("show");
+  drawChart();
+  renderWords(tone);
+  drawCloud(tone);
+  $("ctx").innerHTML = `<p class="hint">Select a word in the cloud or the table to see the sentences it came from.</p>`;
+  requestAnimationFrame(() => $("results").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" }));
+}
+
+/* ---------- price chart ---------- */
+function drawChart() {
+  if (!current) return;
+  const { points: all, quarters, rows } = current;
+  const box = $("chart");
+  const W = Math.max(320, box.clientWidth), H = Math.round(Math.max(240, Math.min(420, W * 0.42)));
+  const pad = { l: 14, r: 64, t: 40, b: 30 };
+  const start = quarters[0].start, end = quarters[1].end;
+  // Keep the baseline close (last close on or before the start) plus everything inside the window.
+  let i0 = 0;
+  all.forEach(([d], i) => { if (d <= start) i0 = i; });
+  const pts = all.slice(i0).filter(([d]) => d <= end);
+  if (pts.length < 2) { box.innerHTML = `<p class="muted" style="padding:20px;margin:0">Not enough price data for this window.</p>`; return; }
+
+  const t = (iso) => Date.parse(iso + "T00:00:00Z");
+  const t0 = t(pts[0][0]), t1 = t(end);
+  const vals = pts.map((p) => p[1]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const span = hi - lo || hi * 0.05;
+  lo -= span * 0.08; hi += span * 0.08;
+  const X = (iso) => pad.l + ((t(iso) - t0) / (t1 - t0)) * (W - pad.l - pad.r);
+  const Y = (v) => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+
+  // nice y ticks
+  const step = niceStep((hi - lo) / 4);
+  const ticks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push(v);
+  const dec = step < 1 ? 2 : 0;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Daily closing price from ${fmtDate(start)} to ${fmtDate(end)}">`;
+  // quarter bands
+  quarters.forEach((q, k) => {
+    const x0 = Math.max(pad.l, X(q.start)), x1 = X(q.end);
+    if (k === 1) svg += `<rect x="${x0}" y="${pad.t - 26}" width="${x1 - x0}" height="${H - pad.t - pad.b + 26}" fill="rgba(255,255,255,.025)"/>`;
+    svg += `<line x1="${x1}" x2="${x1}" y1="${pad.t - 26}" y2="${H - pad.b}" stroke="var(--rule)"/>`;
+    const ch = rows[k].ch;
+    svg += `<text class="qlab" x="${x0 + 10}" y="${pad.t - 10}">${q.name} <tspan fill="${ch > 0 ? "var(--up)" : ch < 0 ? "var(--down)" : "var(--muted)"}" font-family="var(--f-mono)" font-weight="500">${ch == null ? "" : fmtPct(ch)}</tspan></text>`;
+  });
+  // grid + y labels
+  svg += `<g class="axis">`;
+  ticks.forEach((v) => {
+    svg += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--rule)" stroke-dasharray="2 4"/>`;
+    svg += `<text x="${W - pad.r + 10}" y="${Y(v) + 4}">$${v.toFixed(dec)}</text>`;
+  });
+  // month labels
+  const d = new Date(t0); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1);
+  const monthly = [];
+  while (d.getTime() <= t1) { monthly.push(d.toISOString().slice(0, 10)); d.setUTCMonth(d.getUTCMonth() + 1); }
+  const every = W < 520 ? 2 : 1;
+  monthly.forEach((iso, k) => { if (k % every === 0) svg += `<text x="${X(iso)}" y="${H - 10}" text-anchor="middle">${MON[+iso.slice(5, 7) - 1]}</text>`; });
+  svg += `</g>`;
+
+  // price line, colored per quarter
+  quarters.forEach((q, k) => {
+    // From the last close on or before the quarter start (so the two segments join) to the quarter end.
+    let a = 0;
+    pts.forEach(([dd], i) => { if (dd <= q.start) a = i; });
+    const seg = pts.slice(a).filter(([dd]) => dd <= q.end);
+    if (seg.length < 2) return;
+    const col = rows[k].ch < 0 ? "var(--down)" : "var(--up)";
+    const path = seg.map(([dd, v], i) => `${i ? "L" : "M"}${X(dd).toFixed(1)},${Y(v).toFixed(1)}`).join("");
+    const area = `${path}L${X(seg[seg.length - 1][0]).toFixed(1)},${H - pad.b}L${X(seg[0][0]).toFixed(1)},${H - pad.b}Z`;
+    svg += `<path d="${area}" fill="${rows[k].ch < 0 ? "var(--down-wash)" : "var(--up-wash)"}"/>`;
+    svg += `<path d="${path}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+  svg += `<line id="xh" x1="0" x2="0" y1="${pad.t - 26}" y2="${H - pad.b}" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0"/>`;
+  svg += `<circle id="xd" r="4" fill="var(--text)" stroke="var(--ink)" stroke-width="2" opacity="0"/>`;
+  svg += `</svg>`;
+
+  box.innerHTML = svg + `<div class="tip" id="tip"></div>`;
+  const el = box.querySelector("svg"), tip = $("tip"), xh = el.querySelector("#xh"), xd = el.querySelector("#xd");
+  const base = pts[0][1];
+  const move = (ev) => {
+    const r = el.getBoundingClientRect();
+    const sx = ((ev.clientX - r.left) / r.width) * W;
+    let best = 0, bd = Infinity;
+    pts.forEach(([dd], i) => { const dx = Math.abs(X(dd) - sx); if (dx < bd) { bd = dx; best = i; } });
+    const [dd, v] = pts[best];
+    const x = X(dd), y = Y(v);
+    xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("opacity", 1);
+    xd.setAttribute("cx", x); xd.setAttribute("cy", y); xd.setAttribute("opacity", 1);
+    const ch = (v / base - 1) * 100;
+    tip.innerHTML = `${fmtDate(dd)}<br><b>${fmtMoney(v)}</b> <span class="${cls(ch)}">${fmtPct(ch)}</span>`;
+    const scale = r.width / W;
+    let left = x * scale + 12;
+    if (left + 150 > r.width) left = x * scale - 162;
+    tip.style.left = left + "px"; tip.style.top = Math.max(4, y * scale - 54) + "px"; tip.style.opacity = 1;
+  };
+  el.addEventListener("pointermove", move);
+  el.addEventListener("pointerdown", move);
+  el.addEventListener("pointerleave", () => { tip.style.opacity = 0; xh.setAttribute("opacity", 0); xd.setAttribute("opacity", 0); });
+}
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / p;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+/* ---------- word table ---------- */
+let selected = null;
+function renderWords(tone) {
+  const N = 14;
+  const row = (w, i) => w
+    ? `<button class="wbtn ${w.score > 0 ? "up" : "down"}" type="button" data-w="${esc(w.word)}" aria-pressed="false"><span class="rk">${i + 1}</span><span class="w">${esc(w.word)}</span><span class="sc">${w.score > 0 ? "+" : "−"}${Math.abs(w.score)}</span><span class="ct">${w.count}×</span></button>`
+    : `<div class="none">&nbsp;</div>`;
+  const n = Math.max(Math.min(N, Math.max(tone.pos.length, tone.neg.length)), 1);
+  let body = "";
+  for (let i = 0; i < n; i++) body += `<tr><td>${row(tone.pos[i], i)}</td><td>${row(tone.neg[i], i)}</td></tr>`;
+  if (!tone.pos.length && !tone.neg.length) body = `<tr><td colspan="2" class="none">No tone words found.</td></tr>`;
+  $("wTable").innerHTML = `<caption class="muted" style="text-align:left;font-size:12px;padding-bottom:8px;caption-side:top">Strongest words first. Score is tone strength, then how many times it was used.</caption>
+    <thead><tr><th class="side up" scope="col">Most positive (${tone.pos.length})</th><th class="side down" scope="col">Most negative (${tone.neg.length})</th></tr></thead><tbody>${body}</tbody>`;
+}
+$("wTable").addEventListener("click", (e) => { const b = e.target.closest(".wbtn"); if (b) showContext(b.dataset.w); });
+
+function showContext(word) {
+  if (!current) return;
+  const w = current.tone.list.find((x) => x.word === word);
+  if (!w) return;
+  selected = selected === word ? null : word;
+  document.querySelectorAll(".wbtn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.w === selected)));
+  const svg = $("cloud").querySelector("svg");
+  if (svg) {
+    svg.classList.toggle("dimmed", !!selected);
+    svg.querySelectorAll(".cw").forEach((t) => t.classList.toggle("on", t.dataset.w === selected));
+  }
+  if (!selected) { $("ctx").innerHTML = `<p class="hint">Select a word in the cloud or the table to see the sentences it came from.</p>`; return; }
+  const c = w.score > 0 ? "up" : "down";
+  const re = new RegExp(`\\b(${word.replace(/[-']/g, "[-'’]")}(?:'s)?)\\b`, "gi");
+  const items = w.refs.map((i) => {
+    let s = current.tone.sentences[i];
+    if (s.length > 360) {
+      const at = s.toLowerCase().indexOf(word);
+      const a = Math.max(0, at - 160);
+      s = (a ? "…" : "") + s.slice(a, a + 340) + "…";
+    }
+    return `<li>${esc(s).replace(re, `<mark class="${c}">$1</mark>`)}</li>`;
+  }).join("");
+  const strength = ["", "mild", "moderate", "strong", "very strong", "very strong"][Math.abs(w.score)];
+  $("ctx").innerHTML = `<h4 class="${c}">${esc(word)}</h4>
+    <p class="sub">${w.score > 0 ? "Positive" : "Negative"}, ${strength} (${w.score > 0 ? "+" : "−"}${Math.abs(w.score)}). Used ${w.count} ${w.count === 1 ? "time" : "times"}${w.negated ? `, plus ${w.negated} negated and not counted` : ""}.</p>
+    <ol>${items}</ol>`;
+}
+
+/* ---------- word cloud ---------- */
+const SIZE = { 1: 20, 2: 29, 3: 41, 4: 57, 5: 78 };
+function drawCloud(tone) {
+  const S = 1000, padding = 7;
+  const words = [...tone.list].sort((a, b) => Math.abs(b.score) - Math.abs(a.score) || b.count - a.count).slice(0, 160);
+  const ctx = document.createElement("canvas").getContext("2d");
+  const measure = (w, size) => {
+    ctx.font = `600 ${size}px "IBM Plex Sans", system-ui, sans-serif`;
+    const m = ctx.measureText(w);
+    const asc = m.actualBoundingBoxAscent || size * 0.72, desc = m.actualBoundingBoxDescent || size * 0.2;
+    return { w: m.width, asc, desc };
+  };
+  // Shrink every word together if the set would crowd the square.
+  const area = words.reduce((a, w) => { const m = measure(w.word, SIZE[Math.abs(w.score)]); return a + (m.w + padding * 2) * (m.asc + m.desc + padding * 2); }, 0);
+  // Scale every word together so the set fills about 40% of the square: shrink a crowded release,
+  // grow a sparse one. Relative sizes, and so the tone strengths, stay the same.
+  const k = Math.max(0.35, Math.min(2, Math.sqrt((S * S * 0.4) / area)));
+
+  const placed = [];
+  const hits = (b) => placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
+  const out = [];
+  let skipped = 0;
+  for (const w of words) {
+    const size = Math.round(SIZE[Math.abs(w.score)] * k);
+    const m = measure(w.word, size);
+    const bw = m.w + padding * 2, bh = m.asc + m.desc + padding * 2;
+    let ok = null;
+    // Archimedean spiral from the center, slightly wider than tall to suit horizontal words.
+    for (let a = 0; a < 260; a += 0.12) {
+      const rr = 3.2 * a;
+      const cx = S / 2 + rr * Math.cos(a) * 1.15, cy = S / 2 + rr * Math.sin(a) * 0.95;
+      const b = { x0: cx - bw / 2, x1: cx + bw / 2, y0: cy - bh / 2, y1: cy + bh / 2 };
+      if (b.x0 < 10 || b.y0 < 10 || b.x1 > S - 10 || b.y1 > S - 10) continue;
+      if (!hits(b)) { ok = { cx, cy, b }; break; }
+    }
+    if (!ok) { skipped++; continue; }
+    placed.push(ok.b);
+    out.push({ w, size, x: ok.cx, y: ok.cy + (m.asc - m.desc) / 2 });
+  }
+  const svg = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Word cloud of ${out.length} tone words. Green words are positive, red words are negative, and size shows strength.">
+    ${out.map((o, i) => `<text class="cw${reduceMotion ? "" : " in"}" data-w="${esc(o.w.word)}" x="${o.x.toFixed(1)}" y="${o.y.toFixed(1)}" text-anchor="middle" font-size="${o.size}" fill="${o.w.score > 0 ? "var(--up)" : "var(--down)"}" opacity="${Math.abs(o.w.score) === 1 ? 0.78 : 1}" style="animation-delay:${Math.min(i * 14, 900)}ms;transform-box:fill-box"><title>${esc(o.w.word)}: ${o.w.score > 0 ? "+" : "−"}${Math.abs(o.w.score)}, used ${o.w.count}×</title>${esc(o.w.word)}</text>`).join("")}
+  </svg>`;
+  $("cloud").innerHTML = out.length ? svg : `<p class="muted" style="padding:20px;margin:0">No tone words found in this release.</p>`;
+  $("cloudCount").textContent = skipped ? `${out.length} of ${tone.list.length} words fit` : `${out.length} words`;
+}
+$("cloud").addEventListener("click", (e) => { const t = e.target.closest(".cw"); if (t) showContext(t.dataset.w); });
+
+let rz;
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 120); });
+
+/* ---------- start ---------- */
+(async function init() {
+  const params = new URLSearchParams(location.search);
+  const wantT = params.get("ticker"), wantAcc = params.get("filing");
+  try {
+    await document.fonts.load('600 20px "IBM Plex Sans"').catch(() => {});
+    const data = await api("/companies");
+    COMPANIES = data.companies;
+    coInput.placeholder = `Ticker or name, like AAPL (${COMPANIES.length} companies)`;
+  } catch (err) {
+    setStatus("The S&P 500 list could not load. You can still type a ticker and press Enter.", "err");
+  }
+  companiesLoading = false;
+  // Someone typed (or pressed Enter) before the list arrived: catch up.
+  if (pendingEnter) {
+    pendingEnter = false; setStatus("");
+    const first = coMatches(coInput.value)[0];
+    if (first) chooseCompany(first.t);
+    else if (!COMPANIES.length) chooseCompany(coInput.value.trim().toUpperCase().replace(/\./g, "-"));
+    else setStatus("That company is not in the S&P 500 list.", "err");
+  } else if (document.activeElement === coInput && coInput.value.trim() && !company) { coActive = 0; renderCo(); }
+  if (wantT && /^[A-Z0-9.\-]{1,10}$/i.test(wantT)) {
+    const ok = await chooseCompany(wantT.toUpperCase().replace(/\./g, "-"), wantAcc);
+    if (ok && release && (!wantAcc || release.acc === wantAcc)) analyze();
+  }
+})();
+</script>
+</body>
+</html>
