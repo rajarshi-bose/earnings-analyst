@@ -18,13 +18,9 @@ Live at https://jarsh.us/earnings-analyst/ and launched from its project page on
 
 ## Setup
 
-1. Create the repository `rajarshi-bose/earnings-analyst`, push this folder to `main`, and turn on GitHub Pages from `main`. It appears at jarsh.us/earnings-analyst.
-2. Deploy the worker (free Cloudflare plan is enough):
-   - In `worker/wrangler.toml`, set `CONTACT_EMAIL` to an address you check. The SEC asks automated clients to name a contact.
-   - From the `worker` folder run `npx wrangler login`, then `npx wrangler deploy`.
-   - Wrangler prints the worker address, something like `https://earnings-analyst-api.<your-subdomain>.workers.dev`.
-3. In `index.html`, set the address near the top of the script (`const API`) to that worker address, then push.
-4. Open jarsh.us/earnings-analyst and try a company.
+Already done: the repository serves the app at jarsh.us/earnings-analyst, and the worker runs at https://earnings-analyst-api.rajarshi-bose-us.workers.dev with `CONTACT_EMAIL` set in the Cloudflare dashboard.
+
+To redeploy the worker after changing `worker/worker.js`, either paste it into the worker's code editor in the Cloudflare dashboard and deploy, or run `npx wrangler deploy` from the `worker` folder.
 
 ## Testing locally
 
