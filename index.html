@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Earnings Report Qualitative Analyst</title>
-<meta name="description" content="Pick an S&P 500 company and a quarter. Read the tone of its earnings release and the share price in the two quarters before it.">
+<meta name="description" content="Pick an S&P 500 company and a quarter. Read the tone of its earnings release and the share price before, during and after that quarter.">
 <meta property="og:title" content="Earnings Report Qualitative Analyst">
 <meta property="og:description" content="The tone of an S&P 500 earnings release, word by word, next to the share price before it.">
 <meta name="theme-color" content="#0e1012">
@@ -134,6 +134,8 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
 .prices{margin-top:14px;min-width:620px}
 .prices td:first-child{font-weight:600;white-space:nowrap}
 .prices td:nth-child(2){white-space:nowrap}
+.prices .role{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.prices tr.rep td{background:rgba(255,255,255,.025)}
 
 /* tone */
 .tone{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(16px,2.4vw,32px);align-items:start}
@@ -179,7 +181,26 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
 .method h3{margin:0;font-size:14px;color:var(--text);font-weight:600}
 .method p{margin:0 0 8px;max-width:72ch;text-wrap:pretty}
 
-.foot{border-top:1px solid var(--rule);margin-top:48px;padding-top:18px;padding-bottom:28px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px}
+.foot{border-top:1px solid var(--rule);margin-top:48px;padding-top:18px;padding-bottom:72px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px}
+
+
+/* version + fixes log */
+.ver-row{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:12px;z-index:30;display:flex;align-items:center;gap:10px;padding:5px 5px 5px 12px;background:rgba(14,16,18,.92);border:1px solid var(--rule)}
+.ver{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ver-btn{font:600 12px var(--f-body);padding:4px 11px;border:1px solid var(--rule);border-radius:0;background:var(--panel-2);color:var(--text);transition:border-color .15s,color .15s}
+.ver-btn:hover,.ver-btn:focus-visible{border-color:var(--up);color:var(--up)}
+.overlay{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:12px}
+.overlay[hidden]{display:none}
+.fixes{width:min(560px,100%);max-height:calc(100vh - 24px);overflow:auto;background:var(--panel);border:1px solid var(--rule);padding:18px 22px;animation:drop .2s var(--ease-out)}
+.fixes-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.fixes-head h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:18px;text-transform:uppercase}
+.fx{border-top:1px solid var(--rule);padding:12px 0 4px}
+.fx:first-of-type{border-top:0}
+.fx h4{margin:0 0 6px;font-family:var(--f-mono);font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+.fx .cur{font:600 11px var(--f-body);background:var(--up);color:#000;padding:1px 6px}
+.fx .fxd{margin-left:auto;font:400 12px var(--f-body);color:var(--muted)}
+.fx ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px;color:var(--text)}
+.fx li::marker{color:var(--muted)}
 
 @media (max-width:900px){
   .controls{grid-template-columns:1fr 1fr}
@@ -224,7 +245,7 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
 <main class="wrap">
   <div class="hero">
     <h1><span>Earnings report</span><span><em>qualitative</em> <i>analyst</i></span></h1>
-    <p>Pick an S&amp;P 500 company and one of its quarterly earnings releases. The tool reads the release from SEC EDGAR, scores the tone of every word, and sets it next to how the stock moved in the two quarters before.</p>
+    <p>Pick an S&amp;P 500 company and one of its quarterly earnings releases. The tool reads the release from SEC EDGAR, scores the tone of every word, and sets it next to how the stock moved in the quarter before, the quarter itself and the quarter after.</p>
   </div>
 
   <form class="controls" id="form" autocomplete="off" novalidate>
@@ -264,7 +285,7 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
 
     <section class="blk" aria-labelledby="pH">
       <div class="bh">
-        <h3 id="pH">Share price before the quarter</h3>
+        <h3 id="pH">Share price around the quarter</h3>
         <p id="pNote"></p>
       </div>
       <div class="chart" id="chart"><div class="tip" id="tip"></div></div>
@@ -308,6 +329,12 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
   <span>Earnings Report Qualitative Analyst, a tool on jarsh.us</span>
   <span>Not investment advice</span>
 </footer>
+
+<div class="ver-row"><span class="ver" id="verLabel">Earnings Analyst</span><button class="ver-btn" id="fixesBtn" type="button">Fixes</button></div>
+<div class="overlay" id="fixesModal" hidden><div class="fixes" role="dialog" aria-modal="true" aria-labelledby="fixesTitle">
+  <div class="fixes-head"><h3 id="fixesTitle">Fixes</h3><button class="ver-btn" id="fixesClose" type="button">Close</button></div>
+  <div id="fixesList"></div>
+</div></div>
 
 <script>
 "use strict";
@@ -355,6 +382,7 @@ const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits:
 const fmtPct = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(1) + "%";
 const fmtPts = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n).toFixed(1) + " pts";
 const cls = (n) => (n > 0 ? "up" : n < 0 ? "down" : "");
+const addMonths = (iso, m) => { const d = new Date(iso + "T00:00:00Z"), day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + m); d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate())); return d.toISOString().slice(0, 10); };
 const addDays = (iso, k) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); };
 // A quarter is named by the calendar quarter holding most of it (a quarter ending Oct 26 is Q3).
 const quarterName = (end) => { const d = new Date(addDays(end, -45) + "T00:00:00Z"); return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`; };
@@ -511,9 +539,13 @@ async function analyze() {
   $("go").disabled = true;
   setStatus("Reading the release and loading prices", "busy");
 
-  // The two quarters before the reported one: (end Q-3, end Q-2] and (end Q-2, end Q-1].
-  const [e1, e2, e3] = r.priorEnds;
-  const from = addDays(e3, -10), to = e1;
+  // Three quarters: the one before, the reported one, and the one after (so far, if it is still running).
+  // The next quarter's end comes from the company's own later release when there is one.
+  const [e1, e2] = r.priorEnds;
+  const nextEnd = releases.map((x) => x.periodEnd).filter((p) => p > r.periodEnd).sort()[0] || addMonths(r.periodEnd, 3);
+  const today = new Date().toISOString().slice(0, 10);
+  const to = nextEnd < today ? nextEnd : today;
+  const from = addDays(e2, -10);
   try {
     const [rep, px, ix] = await Promise.all([
       api(`/report?cik=${c.cik}&acc=${r.acc}`),
@@ -524,9 +556,12 @@ async function analyze() {
     const tone = readTone(rep.html);
     if (tone.words < 40) throw new Error("This release has too little text to read. Try another quarter.");
     const quarters = [
-      { name: quarterName(e2), start: e3, end: e2 },
-      { name: quarterName(e1), start: e2, end: e1 },
+      { name: quarterName(e1), role: "before", start: e2, end: e1 },
+      { name: quarterName(r.periodEnd), role: "reported", start: e1, end: r.periodEnd },
     ];
+    // The quarter after counts once it has at least two trading days of prices.
+    if (px.points.filter(([d]) => d > r.periodEnd && d <= to).length >= 2)
+      quarters.push({ name: quarterName(nextEnd), role: to < nextEnd ? "after, so far" : "after", start: r.periodEnd, end: to, partial: to < nextEnd });
     renderResults(c, r, rep, tone, px.points, ix && ix.points, quarters);
     setStatus("");
     const q = new URLSearchParams(location.search);
@@ -607,7 +642,7 @@ function readTone(html) {
 let current = null;
 
 function renderResults(c, r, rep, tone, points, index, quarters) {
-  current = { tone, points, quarters };
+  current = { tone, points, quarters, filed: r.filed };
   $("rTitle").innerHTML = `${esc(c.n)}<span class="tk">${esc(c.t.replace(/-/g, "."))}</span>`;
   $("rMeta").innerHTML = `<b>${quarterName(r.periodEnd)}</b> earnings, quarter ended ${fmtDate(r.periodEnd)}${r.periodEstimated ? " (estimated)" : ""}. Released ${fmtDate(r.filed)}.`;
   $("rLink").href = rep.url;
@@ -628,19 +663,21 @@ function renderResults(c, r, rep, tone, points, index, quarters) {
     const ia = index && at(index, q.start), ib = index && at(index, q.end);
     return { ...q, a, b, ch: a && b ? (b / a - 1) * 100 : null, ich: ia && ib ? (ib / ia - 1) * 100 : null };
   });
-  const all = { name: "Both quarters", start: quarters[0].start, end: quarters[1].end, a: rows[0].a, b: rows[1].b };
+  const last = rows[rows.length - 1];
+  const all = { name: rows.length === 3 ? "All three quarters" : "Both quarters", start: quarters[0].start, end: last.end, a: rows[0].a, b: last.b };
   all.ch = all.a && all.b ? (all.b / all.a - 1) * 100 : null;
   const ia = index && at(index, all.start), ib = index && at(index, all.end);
   all.ich = ia && ib ? (ib / ia - 1) * 100 : null;
   current.rows = rows;
 
   const cell = (v, f) => (v == null ? `<td class="num r muted">n/a</td>` : `<td class="num r ${cls(v)}">${f(v)}</td>`);
-  const tr = (q, total) => `<tr${total ? ' class="total"' : ""}><td>${q.name}</td><td class="num muted">${fmtDate(addDays(q.start, 1), false)} to ${fmtDate(q.end)}</td>
+  const tr = (q, total) => `<tr${total ? ' class="total"' : ""}${q.role === "reported" ? ' class="rep"' : ""}><td>${q.name}${q.role ? `<span class="role">${q.role}</span>` : ""}</td><td class="num muted">${fmtDate(addDays(q.start, 1), false)} to ${fmtDate(q.end)}</td>
     <td class="num r">${q.a ? fmtMoney(q.a) : "n/a"}</td><td class="num r">${q.b ? fmtMoney(q.b) : "n/a"}</td>
     ${cell(q.ch, fmtPct)}${cell(q.ich, fmtPct)}${cell(q.ch != null && q.ich != null ? q.ch - q.ich : null, fmtPts)}</tr>`;
   $("pTable").innerHTML = `<thead><tr><th>Quarter</th><th>Dates</th><th class="r">Start price</th><th class="r">End price</th><th class="r">Change</th><th class="r">S&amp;P 500</th><th class="r">Against the index</th></tr></thead>
     <tbody>${rows.map((q) => tr(q)).join("")}${tr(all, true)}</tbody>`;
-  $("pNote").textContent = `The two quarters before ${quarterName(r.periodEnd)}. Start price is the close on the day the quarter began.`;
+  const after = rows[2];
+  $("pNote").textContent = `The quarter before ${quarterName(r.periodEnd)}, the quarter itself, and ${after ? (after.partial ? "the quarter after so far" : "the quarter after") : "no quarter after yet"}. The dashed line marks the release.`;
 
   $("results").classList.add("show");
   drawChart();
@@ -656,8 +693,8 @@ function drawChart() {
   const { points: all, quarters, rows } = current;
   const box = $("chart");
   const W = Math.max(320, box.clientWidth), H = Math.round(Math.max(240, Math.min(420, W * 0.42)));
-  const pad = { l: 14, r: 64, t: 40, b: 30 };
-  const start = quarters[0].start, end = quarters[1].end;
+  const pad = { l: 14, r: 64, t: 52, b: 30 };
+  const start = quarters[0].start, end = quarters[quarters.length - 1].end;
   // Keep the baseline close (last close on or before the start) plus everything inside the window.
   let i0 = 0;
   all.forEach(([d], i) => { if (d <= start) i0 = i; });
@@ -683,10 +720,11 @@ function drawChart() {
   // quarter bands
   quarters.forEach((q, k) => {
     const x0 = Math.max(pad.l, X(q.start)), x1 = X(q.end);
-    if (k === 1) svg += `<rect x="${x0}" y="${pad.t - 26}" width="${x1 - x0}" height="${H - pad.t - pad.b + 26}" fill="rgba(255,255,255,.025)"/>`;
+    if (q.role === "reported") svg += `<rect x="${x0}" y="${pad.t - 26}" width="${x1 - x0}" height="${H - pad.t - pad.b + 26}" fill="rgba(255,255,255,.025)"/>`;
     svg += `<line x1="${x1}" x2="${x1}" y1="${pad.t - 26}" y2="${H - pad.b}" stroke="var(--rule)"/>`;
     const ch = rows[k].ch;
-    svg += `<text class="qlab" x="${x0 + 10}" y="${pad.t - 10}">${q.name} <tspan fill="${ch > 0 ? "var(--up)" : ch < 0 ? "var(--down)" : "var(--muted)"}" font-family="var(--f-mono)" font-weight="500">${ch == null ? "" : fmtPct(ch)}</tspan></text>`;
+    svg += `<text class="qlab" x="${x0 + 10}" y="${pad.t - 24}">${q.name}${q.partial ? '<tspan fill="var(--muted)" font-weight="500"> so far</tspan>' : ""}</text>`;
+    svg += `<text x="${x0 + 10}" y="${pad.t - 9}" font-family="var(--f-mono)" font-size="12" fill="${ch > 0 ? "var(--up)" : ch < 0 ? "var(--down)" : "var(--muted)"}">${ch == null ? "" : fmtPct(ch)}</text>`;
   });
   // grid + y labels
   svg += `<g class="axis">`;
@@ -715,6 +753,12 @@ function drawChart() {
     svg += `<path d="${area}" fill="${rows[k].ch < 0 ? "var(--down-wash)" : "var(--up-wash)"}"/>`;
     svg += `<path d="${path}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
   });
+  if (current.filed > start && current.filed <= end) {
+    const xr = X(current.filed);
+    svg += `<line x1="${xr}" x2="${xr}" y1="${pad.t - 4}" y2="${H - pad.b}" stroke="var(--text)" stroke-width="1.2" stroke-dasharray="4 3" opacity=".7"/>`;
+    const room = xr + 110 < W - pad.r;
+    svg += `<text x="${room ? xr + 5 : xr - 5}" y="${H - pad.b - 8}" text-anchor="${room ? "start" : "end"}" font-family="var(--f-body)" font-size="11" font-weight="600" fill="var(--text)">Release ${fmtDate(current.filed, false)}</text>`;
+  }
   svg += `<line id="xh" x1="0" x2="0" y1="${pad.t - 26}" y2="${H - pad.b}" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0"/>`;
   svg += `<circle id="xd" r="4" fill="var(--text)" stroke="var(--ink)" stroke-width="2" opacity="0"/>`;
   svg += `</svg>`;
@@ -854,6 +898,26 @@ $("cloud").addEventListener("click", (e) => { const t = e.target.closest(".cw");
 
 let rz;
 addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 120); });
+
+/* ---------- version + fixes log ---------- */
+// Update log, newest first. Each published update adds a version at the top.
+const CHANGELOG = [
+  { v: "1.2", d: "Nov 9, 2026", n: [
+    "Prices now cover the quarter before the report, the reported quarter, and the quarter after (so far, if it is still running)",
+    "A dashed line on the price chart marks the day the release came out",
+    "Added this Fixes log and a version number in the bottom-right corner"] },
+  { v: "1.1", d: "Nov 9, 2026", n: ["The word cloud shrinks and tries again until every word fits, so the strongest words are never left out"] },
+  { v: "1.0", d: "Nov 9, 2026", n: ["First release: the tone of an S&P 500 earnings release, word by word, next to the share price in the two quarters before it"] },
+];
+$("verLabel").textContent = `Earnings Analyst ${CHANGELOG[0].v}`;
+$("fixesList").innerHTML = CHANGELOG.map((c, i) =>
+  `<section class="fx"><h4>Version ${esc(c.v)}${i === 0 ? ' <span class="cur">current</span>' : ""}<span class="fxd">${esc(c.d)}</span></h4><ul>${c.n.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></section>`).join("");
+const openFixes = () => { $("fixesModal").hidden = false; $("fixesClose").focus(); };
+const closeFixes = () => { $("fixesModal").hidden = true; $("fixesBtn").focus(); };
+$("fixesBtn").addEventListener("click", openFixes);
+$("fixesClose").addEventListener("click", closeFixes);
+$("fixesModal").addEventListener("click", (e) => { if (e.target === $("fixesModal")) closeFixes(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("fixesModal").hidden) closeFixes(); });
 
 /* ---------- start ---------- */
 (async function init() {
