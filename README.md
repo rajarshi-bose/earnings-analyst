@@ -22,6 +22,8 @@ Already done: the repository serves the app at jarsh.us/earnings-analyst, and th
 
 To redeploy the worker after changing `worker/worker.js`, either paste it into the worker's code editor in the Cloudflare dashboard and deploy, or run `npx wrangler deploy` from the `worker` folder.
 
+Headlines come from Finnhub's company news when the worker has a `FINNHUB_KEY` secret (free key from finnhub.io, added in the Cloudflare dashboard under Settings, Variables and secrets, type Secret). Without it, the worker tries Google News and then GDELT, which often refuse requests from Cloudflare's servers. The free Finnhub plan covers roughly the last year of news.
+
 ## Testing locally
 
 Serve the folder (for example `python3 -m http.server`) and open `http://localhost:8000/?api=<worker address>`. The `api` override only works on localhost.

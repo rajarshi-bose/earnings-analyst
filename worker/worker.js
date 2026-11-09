@@ -10,7 +10,8 @@
 //   /prices?symbol=AAPL&from=2026-01-01&to=2026-06-30
 //                                      daily closes, split and dividend adjusted
 //   /news?q=Apple&ticker=AAPL&from=2026-06-28&to=2026-11-05
-//                                      headlines about the company in that window (Google News)
+//                                      headlines about the company in that window
+//                                      (Finnhub when FINNHUB_KEY is set, then Google News, then GDELT)
 //
 // Set CONTACT_EMAIL in wrangler.toml: the SEC asks every automated client to name a contact.
 
@@ -42,7 +43,7 @@ export default {
         case "/filings": body = await filings(url, ua); ttl = 6 * HOUR; break;
         case "/report": body = await report(url, ua); ttl = 30 * DAY; break;
         case "/prices": ({ body, ttl } = await prices(url)); break;
-        case "/news": ({ body, ttl } = await news(url)); break;
+        case "/news": ({ body, ttl } = await news(url, env)); break;
         case "": return json({ ok: true, routes: ["/companies", "/filings", "/report", "/prices", "/news"] }, 200, cors);
         default: return json({ error: "Unknown route." }, 404, cors);
       }
@@ -251,7 +252,7 @@ async function stooq(symbol, from, to) {
 
 /* ---------- news ---------- */
 
-async function news(url) {
+async function news(url, env) {
   const q = (url.searchParams.get("q") || "").replace(/["<>]/g, "").trim().slice(0, 60);
   const ticker = normTicker(url.searchParams.get("ticker") || "");
   const from = url.searchParams.get("from") || "";
@@ -259,7 +260,38 @@ async function news(url) {
   if (!q) throw httpError(400, "Missing company name.");
   if (!isDate(from) || !isDate(to) || from > to || daysBetween(from, to) > 200) throw httpError(400, "Bad date range.");
 
-  // One search per month, so results spread across the whole window instead of bunching at the end.
+  const name = q.toLowerCase().split(/\s+/)[0];
+  const tick = ticker.replace(/-/g, ".").toLowerCase();
+  const seen = new Set();
+  const items = [];
+  const diag = {};
+  let source = "";
+  // Keep headlines inside the window that actually name the company, one copy of each.
+  const add = (list) => {
+    let n = 0;
+    for (const it of list) {
+      if (it.date < from || it.date > to) continue;
+      const t = it.title.toLowerCase();
+      const named = new RegExp(`\\b${escapeRe(q.toLowerCase())}\\b`).test(t) || new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t));
+      if (!named) continue;
+      const key = t.replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(it);
+      n++;
+    }
+    return n;
+  };
+
+  // 1. Finnhub company news, when a key is set (FINNHUB_KEY secret in the Cloudflare dashboard).
+  if (env.FINNHUB_KEY && ticker) {
+    const f = await finnhub(ticker, from, to, env.FINNHUB_KEY).catch((e) => ({ status: "error " + e.message, items: [] }));
+    diag.finnhub = f.status;
+    if (add(f.items)) source = "Finnhub";
+  }
+  if (items.length >= 5) return finish();
+
+  // 2. Google News, one search per month so results spread across the window.
   const chunks = [];
   for (let a = from; a <= to; a = addDaysIso(a, 31)) {
     const b = addDaysIso(a, 31) > to ? addDaysIso(to, 1) : addDaysIso(a, 31);
@@ -267,45 +299,36 @@ async function news(url) {
   }
   const query = (a, b) => `"${q}" (stock OR shares OR earnings OR revenue OR analysts) after:${a} before:${b}`;
   const results = await Promise.all(chunks.map(([a, b]) => googleNews(query(a, b)).catch((e) => ({ status: "error " + e.message, items: [] }))));
-  const diag = { google: results.map((r) => r.status) };
-  let source = "Google News";
-  let lists = results.map((r) => r.items);
+  diag.google = results.map((r) => r.status);
+  if (add(results.flatMap((r) => r.items)) && !source) source = "Google News";
 
-  // Keep headlines inside the window that actually name the company, one copy of each.
-  const name = q.toLowerCase().split(/\s+/)[0];
-  const tick = ticker.replace(/-/g, ".").toLowerCase();
-  const seen = new Set();
-  const items = [];
-  for (const it of lists.flat()) {
-    if (it.date < from || it.date > to) continue;
-    const t = it.title.toLowerCase();
-    const named = new RegExp(`\\b${escapeRe(q.toLowerCase())}\\b`).test(t) || new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t));
-    if (!named) continue;
-    const key = t.replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    items.push(it);
-  }
-  // Google often refuses requests from data centers. Fall back to GDELT's news index.
+  // 3. GDELT's news index, when the others found little.
   if (items.length < 3) {
     const g = await gdelt(q, from, to).catch((e) => ({ status: "error " + e.message, items: [] }));
     diag.gdelt = g.status;
-    for (const it of g.items) {
-      if (it.date < from || it.date > to) continue;
-      const t = it.title.toLowerCase();
-      if (!(new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t)))) continue;
-      const key = t.replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push(it);
-    }
-    if (g.items.length) source = items.length ? "GDELT" : source;
+    if (add(g.items) && !source) source = "GDELT";
   }
-  items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const settled = daysBetween(to, new Date().toISOString().slice(0, 10)) > 4;
-  // Do not cache an empty answer for long: the sources may simply have refused this time.
-  const ttl = !items.length ? 10 * 60 : settled ? 7 * DAY : 3 * HOUR;
-  return { body: { q, from, to, source, diag, items: items.slice(0, 150) }, ttl };
+  return finish();
+
+  function finish() {
+    items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const settled = daysBetween(to, new Date().toISOString().slice(0, 10)) > 4;
+    // Do not cache an empty answer for long: the sources may simply have refused this time.
+    const ttl = !items.length ? 10 * 60 : settled ? 7 * DAY : 3 * HOUR;
+    return { body: { q, from, to, source: source || "news search", diag, items: items.slice(0, 150) }, ttl };
+  }
+}
+
+async function finnhub(ticker, from, to, key) {
+  const sym = ticker.replace(/-/g, ".");
+  const res = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}&token=${encodeURIComponent(key)}`);
+  if (!res.ok) return { status: res.status, items: [] };
+  const data = await res.json();
+  if (!Array.isArray(data)) return { status: "unexpected", items: [] };
+  const items = data
+    .filter((a) => a.headline && a.datetime && /^https?:\/\//.test(a.url || ""))
+    .map((a) => ({ date: new Date(a.datetime * 1000).toISOString().slice(0, 10), title: a.headline.trim(), source: a.source || "", link: a.url }));
+  return { status: 200, items };
 }
 
 async function googleNews(query) {
