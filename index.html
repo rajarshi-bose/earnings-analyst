@@ -805,32 +805,44 @@ function drawCloud(tone) {
     const asc = m.actualBoundingBoxAscent || size * 0.72, desc = m.actualBoundingBoxDescent || size * 0.2;
     return { w: m.width, asc, desc };
   };
-  // Shrink every word together if the set would crowd the square.
-  const area = words.reduce((a, w) => { const m = measure(w.word, SIZE[Math.abs(w.score)]); return a + (m.w + padding * 2) * (m.asc + m.desc + padding * 2); }, 0);
   // Scale every word together so the set fills about 40% of the square: shrink a crowded release,
   // grow a sparse one. Relative sizes, and so the tone strengths, stay the same.
-  const k = Math.max(0.35, Math.min(2, Math.sqrt((S * S * 0.4) / area)));
+  const area = words.reduce((a, w) => { const m = measure(w.word, SIZE[Math.abs(w.score)]); return a + (m.w + padding * 2) * (m.asc + m.desc + padding * 2); }, 0);
+  const widest = Math.max(1, ...words.map((w) => measure(w.word, SIZE[Math.abs(w.score)]).w + padding * 2));
+  let k = Math.max(0.3, Math.min(3, Math.sqrt((S * S * 0.4) / area), (S * 0.8) / widest));
 
-  const placed = [];
-  const hits = (b) => placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
-  const out = [];
-  let skipped = 0;
-  for (const w of words) {
-    const size = Math.round(SIZE[Math.abs(w.score)] * k);
-    const m = measure(w.word, size);
-    const bw = m.w + padding * 2, bh = m.asc + m.desc + padding * 2;
-    let ok = null;
-    // Archimedean spiral from the center, slightly wider than tall to suit horizontal words.
-    for (let a = 0; a < 260; a += 0.12) {
-      const rr = 3.2 * a;
-      const cx = S / 2 + rr * Math.cos(a) * 1.15, cy = S / 2 + rr * Math.sin(a) * 0.95;
-      const b = { x0: cx - bw / 2, x1: cx + bw / 2, y0: cy - bh / 2, y1: cy + bh / 2 };
-      if (b.x0 < 10 || b.y0 < 10 || b.x1 > S - 10 || b.y1 > S - 10) continue;
-      if (!hits(b)) { ok = { cx, cy, b }; break; }
+  // Lay out on a spiral; if any word does not fit, shrink everything a little and try again,
+  // so the strongest words are never the ones left out.
+  let out, skipped;
+  for (let tries = 0; tries < 14; tries++) {
+    ({ out, skipped } = layout(k));
+    if (!skipped) break;
+    k *= 0.9;
+  }
+
+  function layout(k) {
+    const placed = [];
+    const hits = (b) => placed.some((p) => b.x0 < p.x1 && b.x1 > p.x0 && b.y0 < p.y1 && b.y1 > p.y0);
+    const out = [];
+    let skipped = 0;
+    for (const w of words) {
+      const size = Math.round(SIZE[Math.abs(w.score)] * k);
+      const m = measure(w.word, size);
+      const bw = m.w + padding * 2, bh = m.asc + m.desc + padding * 2;
+      let ok = null;
+      // Archimedean spiral from the center, slightly wider than tall to suit horizontal words.
+      for (let a = 0; a < 260; a += 0.12) {
+        const rr = 3.2 * a;
+        const cx = S / 2 + rr * Math.cos(a) * 1.15, cy = S / 2 + rr * Math.sin(a) * 0.95;
+        const b = { x0: cx - bw / 2, x1: cx + bw / 2, y0: cy - bh / 2, y1: cy + bh / 2 };
+        if (b.x0 < 10 || b.y0 < 10 || b.x1 > S - 10 || b.y1 > S - 10) continue;
+        if (!hits(b)) { ok = { cx, cy, b }; break; }
+      }
+      if (!ok) { skipped++; continue; }
+      placed.push(ok.b);
+      out.push({ w, size, x: ok.cx, y: ok.cy + (m.asc - m.desc) / 2 });
     }
-    if (!ok) { skipped++; continue; }
-    placed.push(ok.b);
-    out.push({ w, size, x: ok.cx, y: ok.cy + (m.asc - m.desc) / 2 });
+    return { out, skipped };
   }
   const svg = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="Word cloud of ${out.length} tone words. Green words are positive, red words are negative, and size shows strength.">
     ${out.map((o, i) => `<text class="cw${reduceMotion ? "" : " in"}" data-w="${esc(o.w.word)}" x="${o.x.toFixed(1)}" y="${o.y.toFixed(1)}" text-anchor="middle" font-size="${o.size}" fill="${o.w.score > 0 ? "var(--up)" : "var(--down)"}" opacity="${Math.abs(o.w.score) === 1 ? 0.78 : 1}" style="animation-delay:${Math.min(i * 14, 900)}ms;transform-box:fill-box"><title>${esc(o.w.word)}: ${o.w.score > 0 ? "+" : "−"}${Math.abs(o.w.score)}, used ${o.w.count}×</title>${esc(o.w.word)}</text>`).join("")}
