@@ -137,6 +137,22 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
 .prices .role{display:block;font-size:12px;font-weight:400;color:var(--muted)}
 .prices tr.rep td{background:rgba(255,255,255,.025)}
 
+/* headlines */
+.hsum{margin:0 0 10px;font-size:14px;color:var(--muted)}
+.hsum b{color:var(--text);font-weight:600}
+.hlist{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.hlist li{display:grid;grid-template-columns:5.5em minmax(0,1fr) auto;gap:4px 16px;align-items:baseline;padding:10px 12px 10px 14px;border-bottom:1px solid var(--rule);box-shadow:inset 3px 0 0 var(--dim)}
+.hlist li.t-up{box-shadow:inset 3px 0 0 var(--up)}
+.hlist li.t-down{box-shadow:inset 3px 0 0 var(--down)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hd{font-size:12px;color:var(--muted)}
+.ht{font-weight:500;text-decoration:none;text-wrap:pretty;transition:color .15s}
+.ht:hover{color:var(--up);text-decoration:underline;text-underline-offset:3px}
+.hs{font-size:12px;color:var(--muted);white-space:nowrap}
+.hbtn{margin-top:12px;font:600 13px var(--f-body);padding:7px 13px;border:1px solid var(--rule);border-radius:0;background:var(--panel-2);color:var(--text);transition:border-color .15s,color .15s}
+.hbtn:hover{border-color:var(--up);color:var(--up)}
+.hempty{margin:0;padding:14px 0;border-top:1px solid var(--rule)}
+
 /* tone */
 .tone{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(16px,2.4vw,32px);align-items:start}
 .cloudbox{position:relative;aspect-ratio:1/1;background:var(--panel);border:1px solid var(--rule);overflow:hidden}
@@ -220,6 +236,8 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
   .prices th,.prices td{padding-right:8px;font-size:13px}
   .prices th{white-space:normal}
   .wt .rk{display:none}
+  .hlist li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .hlist .hs{order:3}
   .wbtn{padding:9px 6px;gap:5px}
   .wbtn .ct{min-width:0}
 }
@@ -292,6 +310,14 @@ tr.total td{border-bottom:2px solid var(--text);font-weight:600}
       <div class="scroll"><table class="prices" id="pTable"></table></div>
     </section>
 
+    <section class="blk" aria-labelledby="hH">
+      <div class="bh">
+        <h3 id="hH">Headlines from the quarter</h3>
+        <p id="hNote"></p>
+      </div>
+      <div id="heads"></div>
+    </section>
+
     <section class="blk" aria-labelledby="tH">
       <div class="bh">
         <h3 id="tH">Tone of the release</h3>
@@ -357,6 +383,9 @@ const LEXICON = (() => {
     3: "strong stronger strongly strength strengths accelerate accelerated accelerating acceleration momentum beat beats achieved achievement achievements success successful successfully profitable pleased proud confident confidence healthy solid favorable favorably upside milestone milestones resilient resilience excited exciting rebound rebounded optimistic optimism encouraged encouraging well-positioned outpaced winning wins great happy innovative surpass record-setting",
     2: "growth grew grow growing expand expanded expanding expansion gain gains gained improve improved improvement improvements improving profitability efficient efficiencies efficiency positive opportunity opportunities progress advance advancing raised raise raising benefit benefited benefiting enhance enhanced boost boosted upgrade upgraded attractive valuable rewarding durable recovery recovered leadership leading innovation good better won disciplined accretive tailwind tailwinds",
     1: "stable stability steady steadily consistent consistently sustainable sustained higher strategic benefits discipline secure secured on-track",
+    // headline verbs
+    h2: "rises rose jumps jumped climbs climbed rallies rallied upgrades upbeat",
+    h4: "soars surges",
   };
   const neg = {
     5: "catastrophic disastrous devastating collapse collapsed bankruptcy bankrupt insolvency insolvent fraud fraudulent plummeted plunged plunge crashed",
@@ -364,10 +393,16 @@ const LEXICON = (() => {
     3: "weak weaker weakness weakened weakening impairment impairments impaired missed miss misses adverse adversely failure failures failed fail unfavorable unfavorably slowdown downturn recession disruption disruptions disrupted shortage shortages layoffs penalty penalties violation violations recall recalls breach downgrade downgraded unable inability underperformed underperformance underperforming writedown write-down write-downs write-off write-offs damage damaged erosion eroded poor bad worse struggling struggled struggle suffered unprofitable sluggish stagnant stagnation lackluster worrisome troubled unsuccessful setback setbacks doubtful restated",
     2: "loss losses lost lose decline declined declines declining lowered headwind headwinds challenging difficult difficulty difficulties pressure pressures pressured softness soft softer slowed slower slowing slow uncertain uncertainty uncertainties volatile volatility delay delays delayed restructuring negative negatively concern concerns risky problem problems burden costly dropped drop fell fall falling terminated termination closure closures deficit litigation lawsuit lawsuits investigation dilution dilutive constrained stress strained obstacle obstacles contraction lowest",
     1: "decrease decreased decreases decreasing lower reduced challenge challenges risk risks inflation inflationary tariff tariffs constraints cautious",
+    // headline verbs
+    h2: "falls slides slid sinks slips slipped drops probe",
+    h3: "warns downgrades",
+    h4: "tumbles",
+    h5: "plunges",
   };
   const map = new Map();
-  for (const s in pos) for (const w of pos[s].split(" ")) map.set(w, +s);
-  for (const s in neg) for (const w of neg[s].split(" ")) map.set(w, -s);
+  const val = (k) => +String(k).replace("h", "");
+  for (const s in pos) for (const w of pos[s].split(" ")) map.set(w, val(s));
+  for (const s in neg) for (const w of neg[s].split(" ")) map.set(w, -val(s));
   return map;
 })();
 const NEGATORS = new Set(["not", "no", "never", "without", "nor", "neither", "cannot", "didn't", "don't", "doesn't", "isn't", "wasn't", "weren't", "aren't", "won't", "hasn't", "haven't", "lack", "lacked"]);
@@ -387,6 +422,25 @@ const addDays = (iso, k) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDa
 // A quarter is named by the calendar quarter holding most of it (a quarter ending Oct 26 is Q3).
 const quarterName = (end) => { const d = new Date(addDays(end, -45) + "T00:00:00Z"); return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`; };
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// "Alphabet Inc. (Class A)" -> "Alphabet", "The Walt Disney Company" -> "Walt Disney"
+function shortName(n) {
+  let s = n.replace(/\s*\(.*?\)\s*/g, " ").replace(/^the\s+/i, "").trim();
+  for (let i = 0; i < 3; i++) s = s.replace(/,?\s+(inc\.?|incorporated|corporation|corp\.?|co\.?|company|companies|holdings?|plc|ltd\.?|limited|group|n\.v\.|s\.a\.|& co\.?)$/i, "").trim();
+  return s || n;
+}
+// Tone of a short text: sum of word scores, skipping words right after a negator.
+function textTone(text) {
+  const toks = text.toLowerCase().replace(/[\u2018\u2019]/g, "'").match(/[a-z]+(?:[-'][a-z]+)*/g) || [];
+  let sum = 0;
+  toks.forEach((t, i) => {
+    const v = LEXICON.get(t);
+    if (v === undefined) return;
+    if (toks.slice(Math.max(0, i - 3), i).some((x) => NEGATORS.has(x) || x.endsWith("n't"))) return;
+    sum += v;
+  });
+  return sum;
+}
 
 async function api(path) {
   let res;
@@ -546,11 +600,14 @@ async function analyze() {
   const today = new Date().toISOString().slice(0, 10);
   const to = nextEnd < today ? nextEnd : today;
   const from = addDays(e2, -10);
+  // Headlines: the reported quarter through a few days after the release.
+  const newsTo = addDays(r.filed, 3) < today ? addDays(r.filed, 3) : today;
   try {
-    const [rep, px, ix] = await Promise.all([
+    const [rep, px, ix, nw] = await Promise.all([
       api(`/report?cik=${c.cik}&acc=${r.acc}`),
       api(`/prices?symbol=${encodeURIComponent(c.t)}&from=${from}&to=${to}`),
       api(`/prices?symbol=%5EGSPC&from=${from}&to=${to}`).catch(() => null),
+      api(`/news?q=${encodeURIComponent(shortName(c.n))}&ticker=${encodeURIComponent(c.t)}&from=${e1}&to=${newsTo}`).catch(() => null),
     ]);
     if (run !== running) return;
     const tone = readTone(rep.html);
@@ -562,7 +619,7 @@ async function analyze() {
     // The quarter after counts once it has at least two trading days of prices.
     if (px.points.filter(([d]) => d > r.periodEnd && d <= to).length >= 2)
       quarters.push({ name: quarterName(nextEnd), role: to < nextEnd ? "after, so far" : "after", start: r.periodEnd, end: to, partial: to < nextEnd });
-    renderResults(c, r, rep, tone, px.points, ix && ix.points, quarters);
+    renderResults(c, r, rep, tone, px.points, ix && ix.points, quarters, nw, { from: e1, to: newsTo });
     setStatus("");
     const q = new URLSearchParams(location.search);
     q.set("ticker", c.t); q.set("filing", r.acc);
@@ -641,8 +698,9 @@ function readTone(html) {
 /* ---------- rendering ---------- */
 let current = null;
 
-function renderResults(c, r, rep, tone, points, index, quarters) {
-  current = { tone, points, quarters, filed: r.filed };
+function renderResults(c, r, rep, tone, points, index, quarters, nw, newsWin) {
+  const heads = nw && nw.items ? nw.items.map((h) => ({ ...h, tone: textTone(h.title) })) : null;
+  current = { tone, points, quarters, filed: r.filed, heads: heads || [] };
   $("rTitle").innerHTML = `${esc(c.n)}<span class="tk">${esc(c.t.replace(/-/g, "."))}</span>`;
   $("rMeta").innerHTML = `<b>${quarterName(r.periodEnd)}</b> earnings, quarter ended ${fmtDate(r.periodEnd)}${r.periodEstimated ? " (estimated)" : ""}. Released ${fmtDate(r.filed)}.`;
   $("rLink").href = rep.url;
@@ -679,6 +737,7 @@ function renderResults(c, r, rep, tone, points, index, quarters) {
   const after = rows[2];
   $("pNote").textContent = `The quarter before ${quarterName(r.periodEnd)}, the quarter itself, and ${after ? (after.partial ? "the quarter after so far" : "the quarter after") : "no quarter after yet"}. The dashed line marks the release.`;
 
+  renderHeadlines(heads, newsWin, c);
   $("results").classList.add("show");
   drawChart();
   renderWords(tone);
@@ -759,6 +818,12 @@ function drawChart() {
     const room = xr + 110 < W - pad.r;
     svg += `<text x="${room ? xr + 5 : xr - 5}" y="${H - pad.b - 8}" text-anchor="${room ? "start" : "end"}" font-family="var(--f-body)" font-size="11" font-weight="600" fill="var(--text)">Release ${fmtDate(current.filed, false)}</text>`;
   }
+  // A tick along the bottom of the plot for each headline, colored by its tone.
+  for (const h of current.heads) {
+    if (h.date <= pts[0][0] || h.date > end) continue;
+    const xh = X(h.date);
+    svg += `<rect x="${(xh - 1).toFixed(1)}" y="${H - pad.b - 7}" width="2" height="7" fill="${h.tone > 0 ? "var(--up)" : h.tone < 0 ? "var(--down)" : "var(--muted)"}" opacity=".9"/>`;
+  }
   svg += `<line id="xh" x1="0" x2="0" y1="${pad.t - 26}" y2="${H - pad.b}" stroke="var(--muted)" stroke-dasharray="3 3" opacity="0"/>`;
   svg += `<circle id="xd" r="4" fill="var(--text)" stroke="var(--ink)" stroke-width="2" opacity="0"/>`;
   svg += `</svg>`;
@@ -790,6 +855,27 @@ function niceStep(raw) {
   const p = Math.pow(10, Math.floor(Math.log10(raw)));
   const f = raw / p;
   return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+/* ---------- headlines ---------- */
+const HEAD_FIRST = 12;
+function renderHeadlines(heads, win, c) {
+  const note = `From Google News, ${fmtDate(win.from, false)} to ${fmtDate(win.to)}: the reported quarter through the release. Color shows each headline's tone; ticks on the chart mark their dates.`;
+  $("hNote").textContent = note;
+  if (!heads) { $("heads").innerHTML = `<p class="muted hempty">Headlines could not be loaded right now.</p>`; return; }
+  if (!heads.length) { $("heads").innerHTML = `<p class="muted hempty">No headlines naming ${esc(shortName(c.n))} were found for this quarter.</p>`; return; }
+  const pos = heads.filter((h) => h.tone > 0).length, neg = heads.filter((h) => h.tone < 0).length;
+  const item = (h) => `<li class="${h.tone > 0 ? "t-up" : h.tone < 0 ? "t-down" : "t-flat"}"><span class="sr">${h.tone > 0 ? "Positive: " : h.tone < 0 ? "Negative: " : ""}</span><span class="hd num">${fmtDate(h.date, false)}</span><a class="ht" href="${esc(h.link)}" target="_blank" rel="noopener">${esc(h.title)}</a><span class="hs">${esc(h.source)}</span></li>`;
+  const newest = [...heads].reverse();
+  $("heads").innerHTML = `<p class="hsum"><b>${heads.length}</b> headlines: <span class="up">${pos} positive</span>, <span class="down">${neg} negative</span>, ${heads.length - pos - neg} neutral. Newest first.</p>
+    <ol class="hlist">${newest.slice(0, HEAD_FIRST).map(item).join("")}</ol>
+    ${heads.length > HEAD_FIRST ? `<ol class="hlist" id="hMore" hidden>${newest.slice(HEAD_FIRST).map(item).join("")}</ol><button class="hbtn" id="hBtn" type="button" aria-expanded="false">Show all ${heads.length} headlines</button>` : ""}`;
+  const btn = $("hBtn");
+  if (btn) btn.addEventListener("click", () => {
+    const more = $("hMore"), open = more.hidden;
+    more.hidden = !open; btn.setAttribute("aria-expanded", String(open));
+    btn.textContent = open ? "Show fewer" : `Show all ${heads.length} headlines`;
+  });
 }
 
 /* ---------- word table ---------- */
@@ -902,6 +988,10 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 
 /* ---------- version + fixes log ---------- */
 // Update log, newest first. Each published update adds a version at the top.
 const CHANGELOG = [
+  { v: "1.3", d: "Nov 9, 2026", n: [
+    "Added headlines from the reported quarter through the release, from Google News, each marked green or red by its tone",
+    "Headline dates show as small ticks along the bottom of the price chart",
+    "Tone words now include common headline verbs such as rises, falls, warns and plunges"] },
   { v: "1.2", d: "Nov 9, 2026", n: [
     "Prices now cover the quarter before the report, the reported quarter, and the quarter after (so far, if it is still running)",
     "A dashed line on the price chart marks the day the release came out",
