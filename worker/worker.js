@@ -9,6 +9,8 @@
 //                                      the earnings press release HTML (exhibit 99.1)
 //   /prices?symbol=AAPL&from=2026-01-01&to=2026-06-30
 //                                      daily closes, split and dividend adjusted
+//   /news?q=Apple&ticker=AAPL&from=2026-06-28&to=2026-11-05
+//                                      headlines about the company in that window (Google News)
 //
 // Set CONTACT_EMAIL in wrangler.toml: the SEC asks every automated client to name a contact.
 
@@ -40,7 +42,8 @@ export default {
         case "/filings": body = await filings(url, ua); ttl = 6 * HOUR; break;
         case "/report": body = await report(url, ua); ttl = 30 * DAY; break;
         case "/prices": ({ body, ttl } = await prices(url)); break;
-        case "": return json({ ok: true, routes: ["/companies", "/filings", "/report", "/prices"] }, 200, cors);
+        case "/news": ({ body, ttl } = await news(url)); break;
+        case "": return json({ ok: true, routes: ["/companies", "/filings", "/report", "/prices", "/news"] }, 200, cors);
         default: return json({ error: "Unknown route." }, 404, cors);
       }
 
@@ -246,6 +249,65 @@ async function stooq(symbol, from, to) {
     .map((c) => [c[0], round(+c[4])]);
 }
 
+/* ---------- news ---------- */
+
+async function news(url) {
+  const q = (url.searchParams.get("q") || "").replace(/["<>]/g, "").trim().slice(0, 60);
+  const ticker = normTicker(url.searchParams.get("ticker") || "");
+  const from = url.searchParams.get("from") || "";
+  const to = url.searchParams.get("to") || "";
+  if (!q) throw httpError(400, "Missing company name.");
+  if (!isDate(from) || !isDate(to) || from > to || daysBetween(from, to) > 200) throw httpError(400, "Bad date range.");
+
+  // One search per month, so results spread across the whole window instead of bunching at the end.
+  const chunks = [];
+  for (let a = from; a <= to; a = addDaysIso(a, 31)) {
+    const b = addDaysIso(a, 31) > to ? addDaysIso(to, 1) : addDaysIso(a, 31);
+    chunks.push([a, b]);
+  }
+  const query = (a, b) => `"${q}" (stock OR shares OR earnings OR revenue OR analysts) after:${a} before:${b}`;
+  const lists = await Promise.all(chunks.map(([a, b]) => googleNews(query(a, b)).catch(() => [])));
+
+  // Keep headlines inside the window that actually name the company, one copy of each.
+  const name = q.toLowerCase().split(/\s+/)[0];
+  const tick = ticker.replace(/-/g, ".").toLowerCase();
+  const seen = new Set();
+  const items = [];
+  for (const it of lists.flat()) {
+    if (it.date < from || it.date > to) continue;
+    const t = it.title.toLowerCase();
+    const named = new RegExp(`\\b${escapeRe(q.toLowerCase())}\\b`).test(t) || new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t));
+    if (!named) continue;
+    const key = t.replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(it);
+  }
+  items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const settled = daysBetween(to, new Date().toISOString().slice(0, 10)) > 4;
+  return { body: { q, from, to, source: "Google News", items: items.slice(0, 150) }, ttl: settled ? 7 * DAY : 3 * HOUR };
+}
+
+async function googleNews(query) {
+  const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; jarsh.us earnings analyst)" },
+  });
+  if (!res.ok) return [];
+  const xml = await res.text();
+  const out = [];
+  for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+    const tag = (n) => { const x = m[1].match(new RegExp(`<${n}[^>]*>([\\s\\S]*?)<\\/${n}>`)); return x ? decode(x[1].replace(/^<!\[CDATA\[|\]\]>$/g, "")).trim() : ""; };
+    const source = tag("source");
+    let title = tag("title");
+    if (source && title.endsWith(" - " + source)) title = title.slice(0, -(source.length + 3));
+    const d = new Date(tag("pubDate"));
+    const link = tag("link");
+    if (!title || isNaN(d) || !/^https:\/\//.test(link)) continue;
+    out.push({ date: d.toISOString().slice(0, 10), title, source, link });
+  }
+  return out;
+}
+
 /* ---------- helpers ---------- */
 
 function corsHeaders(origin) {
@@ -270,6 +332,11 @@ function text(html) {
   return html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&nbsp;|&#160;/g, " ").replace(/&#39;|&apos;/g, "'").replace(/\s+/g, " ").trim();
 }
 function normTicker(t) { return String(t).trim().toUpperCase().replace(/\./g, "-").replace(/[^A-Z0-9\-]/g, ""); }
+function addDaysIso(iso, k) { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); }
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+function decode(s) {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&amp;/g, "&");
+}
 function isDate(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s); }
 function daysBetween(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
 function round(n) { return Math.round(n * 10000) / 10000; }
