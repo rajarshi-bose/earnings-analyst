@@ -266,7 +266,10 @@ async function news(url) {
     chunks.push([a, b]);
   }
   const query = (a, b) => `"${q}" (stock OR shares OR earnings OR revenue OR analysts) after:${a} before:${b}`;
-  const lists = await Promise.all(chunks.map(([a, b]) => googleNews(query(a, b)).catch(() => [])));
+  const results = await Promise.all(chunks.map(([a, b]) => googleNews(query(a, b)).catch((e) => ({ status: "error " + e.message, items: [] }))));
+  const diag = { google: results.map((r) => r.status) };
+  let source = "Google News";
+  let lists = results.map((r) => r.items);
 
   // Keep headlines inside the window that actually name the company, one copy of each.
   const name = q.toLowerCase().split(/\s+/)[0];
@@ -283,16 +286,38 @@ async function news(url) {
     seen.add(key);
     items.push(it);
   }
+  // Google often refuses requests from data centers. Fall back to GDELT's news index.
+  if (items.length < 3) {
+    const g = await gdelt(q, from, to).catch((e) => ({ status: "error " + e.message, items: [] }));
+    diag.gdelt = g.status;
+    for (const it of g.items) {
+      if (it.date < from || it.date > to) continue;
+      const t = it.title.toLowerCase();
+      if (!(new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t)))) continue;
+      const key = t.replace(/[^a-z0-9]+/g, " ").trim().slice(0, 90);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push(it);
+    }
+    if (g.items.length) source = items.length ? "GDELT" : source;
+  }
   items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const settled = daysBetween(to, new Date().toISOString().slice(0, 10)) > 4;
-  return { body: { q, from, to, source: "Google News", items: items.slice(0, 150) }, ttl: settled ? 7 * DAY : 3 * HOUR };
+  // Do not cache an empty answer for long: the sources may simply have refused this time.
+  const ttl = !items.length ? 10 * 60 : settled ? 7 * DAY : 3 * HOUR;
+  return { body: { q, from, to, source, diag, items: items.slice(0, 150) }, ttl };
 }
 
 async function googleNews(query) {
   const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; jarsh.us earnings analyst)" },
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+      Accept: "application/rss+xml, application/xml;q=0.9, */*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    redirect: "manual",
   });
-  if (!res.ok) return [];
+  if (res.status !== 200) return { status: res.status, items: [] };
   const xml = await res.text();
   const out = [];
   for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
@@ -305,7 +330,25 @@ async function googleNews(query) {
     if (!title || isNaN(d) || !/^https:\/\//.test(link)) continue;
     out.push({ date: d.toISOString().slice(0, 10), title, source, link });
   }
-  return out;
+  return { status: 200, items: out };
+}
+
+async function gdelt(q, from, to) {
+  const stamp = (iso, end) => iso.replace(/-/g, "") + (end ? "235959" : "000000");
+  const u = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(`"${q}" sourcelang:english`)}&mode=ArtList&format=json&maxrecords=250&sort=HybridRel&startdatetime=${stamp(from)}&enddatetime=${stamp(to, true)}`;
+  const res = await fetch(u, { headers: { "User-Agent": "jarsh.us earnings analyst (https://jarsh.us)" } });
+  if (!res.ok) return { status: res.status, items: [] };
+  let data;
+  try { data = JSON.parse(await res.text()); } catch { return { status: "not json", items: [] }; }
+  const items = (data.articles || [])
+    .filter((a) => a.title && /^https?:\/\//.test(a.url) && /^\d{8}T/.test(a.seendate || ""))
+    .map((a) => ({
+      date: `${a.seendate.slice(0, 4)}-${a.seendate.slice(4, 6)}-${a.seendate.slice(6, 8)}`,
+      title: a.title.replace(/\s+([,.!?:;%])/g, "$1").replace(/\s+'\s*/g, "'").replace(/\s+/g, " ").trim(),
+      source: (a.domain || "").replace(/^www\./, ""),
+      link: a.url,
+    }));
+  return { status: 200, items };
 }
 
 /* ---------- helpers ---------- */

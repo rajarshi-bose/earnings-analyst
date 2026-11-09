@@ -737,7 +737,7 @@ function renderResults(c, r, rep, tone, points, index, quarters, nw, newsWin) {
   const after = rows[2];
   $("pNote").textContent = `The quarter before ${quarterName(r.periodEnd)}, the quarter itself, and ${after ? (after.partial ? "the quarter after so far" : "the quarter after") : "no quarter after yet"}. The dashed line marks the release.`;
 
-  renderHeadlines(heads, newsWin, c);
+  renderHeadlines(heads, newsWin, c, nw && nw.source);
   $("results").classList.add("show");
   drawChart();
   renderWords(tone);
@@ -859,8 +859,8 @@ function niceStep(raw) {
 
 /* ---------- headlines ---------- */
 const HEAD_FIRST = 12;
-function renderHeadlines(heads, win, c) {
-  const note = `From Google News, ${fmtDate(win.from, false)} to ${fmtDate(win.to)}: the reported quarter through the release. Color shows each headline's tone; ticks on the chart mark their dates.`;
+function renderHeadlines(heads, win, c, source) {
+  const note = `From ${source || "Google News"}, ${fmtDate(win.from, false)} to ${fmtDate(win.to)}: the reported quarter through the release. Color shows each headline's tone; ticks on the chart mark their dates.`;
   $("hNote").textContent = note;
   if (!heads) { $("heads").innerHTML = `<p class="muted hempty">Headlines could not be loaded right now.</p>`; return; }
   if (!heads.length) { $("heads").innerHTML = `<p class="muted hempty">No headlines naming ${esc(shortName(c.n))} were found for this quarter.</p>`; return; }
@@ -988,6 +988,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 
 /* ---------- version + fixes log ---------- */
 // Update log, newest first. Each published update adds a version at the top.
 const CHANGELOG = [
+  { v: "1.4", d: "Nov 9, 2026", n: ["Headlines now come from GDELT's news index when Google News is unavailable, and the section says which source it used"] },
   { v: "1.3", d: "Nov 9, 2026", n: [
     "Added headlines from the reported quarter through the release, from Google News, each marked green or red by its tone",
     "Headline dates show as small ticks along the bottom of the price chart",
