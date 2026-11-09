@@ -267,9 +267,10 @@ async function news(url, env) {
   const diag = {};
   let source = "";
   // Keep headlines inside the window that actually name the company, one copy of each.
-  const add = (list) => {
+  const add = (list, max = Infinity) => {
     let n = 0;
     for (const it of list) {
+      if (n >= max) break;
       if (it.date < from || it.date > to) continue;
       const t = it.title.toLowerCase();
       const named = new RegExp(`\\b${escapeRe(q.toLowerCase())}\\b`).test(t) || new RegExp(`\\b${escapeRe(name)}\\b`).test(t) || (tick.length > 1 && new RegExp(`\\b${escapeRe(tick)}\\b`).test(t));
@@ -284,10 +285,21 @@ async function news(url, env) {
   };
 
   // 1. Finnhub company news, when a key is set (FINNHUB_KEY secret in the Cloudflare dashboard).
+  // Finnhub returns only the newest batch for a long range, so ask one week at a time
+  // and keep an even share from each week, so the whole window is covered.
   if (env.FINNHUB_KEY && ticker) {
-    const f = await finnhub(ticker, from, to, env.FINNHUB_KEY).catch((e) => ({ status: "error " + e.message, items: [] }));
-    diag.finnhub = f.status;
-    if (add(f.items)) source = "Finnhub";
+    const weeks = [];
+    for (let a = from; a <= to; a = addDaysIso(a, 7)) {
+      const b = addDaysIso(a, 6) > to ? to : addDaysIso(a, 6);
+      weeks.push([a, b]);
+    }
+    const share = Math.max(4, Math.ceil(150 / weeks.length));
+    const res = await Promise.all(weeks.map(([a, b]) => finnhub(ticker, a, b, env.FINNHUB_KEY).catch((e) => ({ status: "error " + e.message, items: [] }))));
+    const codes = [...new Set(res.map((r) => r.status))];
+    diag.finnhub = codes.length === 1 ? codes[0] : codes;
+    let n = 0;
+    for (const r of res) n += add(r.items, share);
+    if (n) source = "Finnhub";
   }
   if (items.length >= 5) return finish();
 

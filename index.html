@@ -988,7 +988,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 
 /* ---------- version + fixes log ---------- */
 // Update log, newest first. Each published update adds a version at the top.
 const CHANGELOG = [
-  { v: "1.5", d: "Nov 9, 2026", n: ["Headlines now come from Finnhub's company news first, with Google News and GDELT as fallbacks"] },
+  { v: "1.5", d: "Nov 9, 2026", n: ["Headlines now come from Finnhub's company news first, with Google News and GDELT as fallbacks", "Headlines are gathered week by week, so they cover the whole quarter instead of just its last days"] },
   { v: "1.4", d: "Nov 9, 2026", n: ["Headlines now come from GDELT's news index when Google News is unavailable, and the section says which source it used"] },
   { v: "1.3", d: "Nov 9, 2026", n: [
     "Added headlines from the reported quarter through the release, from Google News, each marked green or red by its tone",
